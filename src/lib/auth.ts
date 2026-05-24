@@ -3,6 +3,9 @@ import Google from 'next-auth/providers/google'
 import { createServerSupabaseClient } from '@/lib/supabase'
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  // Required for Cloud Run: requests arrive via reverse proxy with
+  // internal hostname. trustHost lets NextAuth use x-forwarded-* headers.
+  trustHost: true,
   providers: [
     Google({
       clientId: process.env.AUTH_GOOGLE_ID!,
