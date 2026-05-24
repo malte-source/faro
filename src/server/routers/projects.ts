@@ -1,10 +1,15 @@
 import { z } from 'zod'
-import { createTRPCRouter, protectedProcedure } from '@/lib/trpc/server'
+import { createTRPCRouter, protectedProcedure, invalidateCtxCache } from '@/lib/trpc/server'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 import { getFlashModel } from '@/lib/gemini'
 
-async function logAudit(
+/**
+ * Fire-and-forget audit helper.
+ * Never awaited — audit writes are not on the critical path for the user response.
+ * Errors are silently swallowed (audit loss is acceptable vs slowing the UX).
+ */
+function logAudit(
   supabase: SupabaseClient<Database>,
   opts: {
     orgId: string
@@ -17,7 +22,7 @@ async function logAudit(
     changedBy?: string
   }
 ) {
-  await supabase.from('audit_log').insert({
+  void supabase.from('audit_log').insert({
     org_id: opts.orgId,
     entity_type: opts.entityType,
     entity_id: opts.entityId,
@@ -137,7 +142,9 @@ export const projectsRouter = createTRPCRouter({
       if (error) throw error
 
       if (data) {
-        await logAudit(ctx.supabase, {
+        // Bust ctx cache so the new project appears in task filters immediately
+        invalidateCtxCache(ctx.session.user.email!)
+        logAudit(ctx.supabase, {
           orgId: me.org_id,
           entityType: 'project',
           entityId: data.id,
@@ -166,9 +173,8 @@ export const projectsRouter = createTRPCRouter({
       const { id, ...rest } = input
       const { me } = ctx
 
-      const { data: prev } = await ctx.supabase
-        .from('projects').select('status, kanban_stage, progress_pct, name').eq('id', id).single()
-
+      // Single DB round-trip — no pre-fetch of prev values.
+      // Audit logs are fire-and-forget and record the new value only.
       const { data, error } = await ctx.supabase
         .from('projects')
         .update({
@@ -187,24 +193,11 @@ export const projectsRouter = createTRPCRouter({
 
       if (error) throw error
 
-      if (me && prev && data) {
-        const changes: { field: string; old: string; new: string }[] = []
-        if (rest.status && rest.status !== prev.status) changes.push({ field: 'status', old: prev.status, new: rest.status })
-        if (rest.kanbanStage && rest.kanbanStage !== prev.kanban_stage) changes.push({ field: 'kanban_stage', old: prev.kanban_stage, new: rest.kanbanStage })
-        if (rest.progressPct !== undefined && rest.progressPct !== prev.progress_pct) changes.push({ field: 'progress_pct', old: String(prev.progress_pct), new: String(rest.progressPct) })
-
-        for (const change of changes) {
-          await logAudit(ctx.supabase, {
-            orgId: me.org_id,
-            entityType: 'project',
-            entityId: id,
-            action: 'updated',
-            fieldChanged: change.field,
-            oldValue: change.old,
-            newValue: change.new,
-            changedBy: me.id,
-          })
-        }
+      // Fire-and-forget audit for explicitly changed fields
+      if (me && data) {
+        if (rest.status) logAudit(ctx.supabase, { orgId: me.org_id, entityType: 'project', entityId: id, action: 'updated', fieldChanged: 'status', newValue: rest.status, changedBy: me.id })
+        if (rest.kanbanStage) logAudit(ctx.supabase, { orgId: me.org_id, entityType: 'project', entityId: id, action: 'updated', fieldChanged: 'kanban_stage', newValue: rest.kanbanStage, changedBy: me.id })
+        if (rest.progressPct !== undefined) logAudit(ctx.supabase, { orgId: me.org_id, entityType: 'project', entityId: id, action: 'updated', fieldChanged: 'progress_pct', newValue: String(rest.progressPct), changedBy: me.id })
       }
 
       return data
@@ -221,7 +214,8 @@ export const projectsRouter = createTRPCRouter({
       if (error) throw error
 
       if (me && proj) {
-        await logAudit(ctx.supabase, {
+        invalidateCtxCache(ctx.session.user.email!)
+        logAudit(ctx.supabase, {
           orgId: me.org_id,
           entityType: 'project',
           entityId: input,

@@ -11,13 +11,14 @@ export const tasksRouter = createTRPCRouter({
       onlyMine: z.boolean().optional(),
     }).optional())
     .query(async ({ ctx, input }) => {
-      const { me, workspaceIds } = ctx
-      if (!workspaceIds.length) return []
+      const { me, projectIds: allProjectIds } = ctx
+      if (!allProjectIds.length) return []
 
-      let projectQuery = ctx.supabase.from('projects').select('id').in('workspace_id', workspaceIds)
-      if (input?.projectId) projectQuery = projectQuery.eq('id', input.projectId)
-      const { data: projects } = await projectQuery
-      const projectIds = projects?.map(p => p.id) ?? []
+      // Use project IDs from context cache — no extra DB round-trip needed.
+      // If a specific projectId filter is requested, apply it client-side.
+      const projectIds = input?.projectId
+        ? allProjectIds.filter(id => id === input.projectId)
+        : allProjectIds
       if (!projectIds.length) return []
 
       let query = ctx.supabase
@@ -77,14 +78,8 @@ export const tasksRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const { me } = ctx
 
-      const { data: lastTask } = await ctx.supabase
-        .from('tasks')
-        .select('position')
-        .eq('project_id', input.projectId)
-        .order('position', { ascending: false })
-        .limit(1)
-        .single()
-
+      // Use timestamp-based position — avoids a pre-insert SELECT round-trip.
+      // Ordering within a project remains correct since newer tasks get higher values.
       const { data, error } = await ctx.supabase
         .from('tasks')
         .insert({
@@ -99,7 +94,7 @@ export const tasksRouter = createTRPCRouter({
           estimated_hours: input.estimatedHours,
           parent_task_id: input.parentTaskId,
           labels: input.labels,
-          position: (lastTask?.position ?? 0) + 1000,
+          position: Date.now(),
         })
         .select()
         .single()
@@ -117,15 +112,7 @@ export const tasksRouter = createTRPCRouter({
     }),
 
   stats: protectedProcedure.query(async ({ ctx }) => {
-    const { me, workspaceIds } = ctx
-    if (!workspaceIds.length) {
-      return { byStatus: { todo: 0, in_progress: 0, in_review: 0, done: 0, canceled: 0 }, total: 0, myPending: 0, overdue: 0 }
-    }
-
-    const { data: projects } = await ctx.supabase
-      .from('projects').select('id').in('workspace_id', workspaceIds)
-    const projectIds = projects?.map(p => p.id) ?? []
-
+    const { me, projectIds } = ctx
     if (!projectIds.length) {
       return { byStatus: { todo: 0, in_progress: 0, in_review: 0, done: 0, canceled: 0 }, total: 0, myPending: 0, overdue: 0 }
     }
