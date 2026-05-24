@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { trpc } from '@/lib/trpc/client'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -34,6 +34,7 @@ export function TasksOverview() {
   const [statusFilter, setStatusFilter] = useState('all')
   const [priorityFilter, setPriorityFilter] = useState('all')
   const [projectFilter, setProjectFilter] = useState('all')
+  const [sortBy, setSortBy] = useState('created_at')
   const [addOpen, setAddOpen] = useState(false)
   const [addProjectId, setAddProjectId] = useState('')
 
@@ -46,6 +47,32 @@ export function TasksOverview() {
 
   const { data: projects } = trpc.projects.list.useQuery()
   const utils = trpc.useUtils()
+
+  const sortedTasks = useMemo(() => {
+    if (!tasks) return []
+    const PRIORITY_ORDER: Record<string, number> = {
+      very_high: 0, high: 1, medium: 2, low: 3, very_low: 4,
+    }
+    const STATUS_ORDER: Record<string, number> = {
+      in_progress: 0, in_review: 1, todo: 2, done: 3, canceled: 4,
+    }
+    return [...tasks].sort((a, b) => {
+      switch (sortBy) {
+        case 'due_date': {
+          if (!a.due_date && !b.due_date) return 0
+          if (!a.due_date) return 1
+          if (!b.due_date) return -1
+          return a.due_date.localeCompare(b.due_date)
+        }
+        case 'priority':
+          return (PRIORITY_ORDER[a.priority] ?? 99) - (PRIORITY_ORDER[b.priority] ?? 99)
+        case 'status':
+          return (STATUS_ORDER[a.status] ?? 99) - (STATUS_ORDER[b.status] ?? 99)
+        default: // created_at
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      }
+    })
+  }, [tasks, sortBy])
 
   const updateTask = trpc.tasks.update.useMutation({
     onMutate: async (input) => {
@@ -123,6 +150,16 @@ export function TasksOverview() {
           </SelectContent>
         </Select>
 
+        <Select value={sortBy} onValueChange={setSortBy}>
+          <SelectTrigger className="w-36"><SelectValue placeholder="Ordenar" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="created_at">Más recientes</SelectItem>
+            <SelectItem value="due_date">Fecha límite</SelectItem>
+            <SelectItem value="priority">Prioridad</SelectItem>
+            <SelectItem value="status">Estado</SelectItem>
+          </SelectContent>
+        </Select>
+
         {hasFilters && (
           <Button variant="ghost" size="sm" onClick={clearFilters}>Limpiar</Button>
         )}
@@ -162,7 +199,7 @@ export function TasksOverview() {
             ))}
           </div>
         </div>
-      ) : !tasks?.length ? (
+      ) : !sortedTasks.length ? (
         <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white py-20 text-slate-400">
           <AlertCircle className="mb-3 h-8 w-8" />
           <p className="text-sm font-medium">No hay tareas</p>
@@ -181,7 +218,7 @@ export function TasksOverview() {
           </div>
 
           <div className="divide-y divide-slate-50">
-            {tasks.map(task => {
+            {sortedTasks.map(task => {
               const priorityInfo = PRIORITY[task.priority as keyof typeof PRIORITY]
               const days = task.due_date ? daysUntil(task.due_date) : null
               const isOverdue = days !== null && days < 0 && task.status !== 'done' && task.status !== 'canceled'
@@ -254,8 +291,8 @@ export function TasksOverview() {
         </div>
       )}
 
-      {tasks && tasks.length > 0 && (
-        <p className="text-right text-xs text-slate-400">{tasks.length} tarea{tasks.length !== 1 ? 's' : ''}</p>
+      {sortedTasks.length > 0 && (
+        <p className="text-right text-xs text-slate-400">{sortedTasks.length} tarea{sortedTasks.length !== 1 ? 's' : ''}</p>
       )}
 
       {addProjectId && (

@@ -4,6 +4,7 @@ import { Sidebar } from '@/components/layout/sidebar'
 import { MobileNav } from '@/components/layout/mobile-nav'
 import { MobileHeader } from '@/components/layout/mobile-header'
 import { PwaInstallBanner } from '@/components/pwa/install-banner'
+import { MobileFAB } from '@/components/pwa/mobile-fab'
 
 export default async function DashboardLayout({
   children,
@@ -39,6 +40,9 @@ export default async function DashboardLayout({
 
       {/* Bottom nav — visible on mobile only */}
       <MobileNav />
+
+      {/* FAB for quick task creation on mobile */}
+      <MobileFAB />
 
       {/* PWA install prompt — shown when browser fires beforeinstallprompt */}
       <PwaInstallBanner />

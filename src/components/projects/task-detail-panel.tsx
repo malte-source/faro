@@ -6,7 +6,8 @@ import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { PRIORITY } from '@/lib/utils'
-import { X, Calendar, Clock, Trash2, GripHorizontal, CheckCircle2, Circle } from 'lucide-react'
+import { X, Calendar, Clock, Trash2, GripHorizontal, CheckCircle2, Circle, MessageSquare } from 'lucide-react'
+import { TaskComments } from '@/components/tasks/task-comments'
 import type { TaskStatus } from '@/types/database'
 
 const TASK_STATUS_LABEL: Record<TaskStatus, string> = {
@@ -256,6 +257,14 @@ export function TaskDetailPanel({ taskId, projectId, onClose, queryKey = 'byProj
               </div>
             </div>
           )}
+        </div>
+
+        {/* Comments */}
+        <div className="border-t border-slate-100 px-5 py-4">
+          <p className="mb-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">
+            <MessageSquare className="h-3 w-3" /> Comentarios
+          </p>
+          <TaskComments taskId={task.id} />
         </div>
       </div>
     </>

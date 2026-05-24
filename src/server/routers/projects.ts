@@ -42,6 +42,9 @@ export const projectsRouter = createTRPCRouter({
       departmentId: z.string().optional(),
     }).optional())
     .query(async ({ ctx, input }) => {
+      const { workspaceIds } = ctx
+      if (!workspaceIds.length) return []
+
       let query = ctx.supabase
         .from('projects')
         .select(`
@@ -52,6 +55,7 @@ export const projectsRouter = createTRPCRouter({
             user:users(id, name, email, avatar_url)
           )
         `)
+        .in('workspace_id', workspaceIds)
         .order('updated_at', { ascending: false })
 
       if (input?.status) query = query.eq('status', input.status)
@@ -310,9 +314,13 @@ export const projectsRouter = createTRPCRouter({
     }),
 
   dashboard: protectedProcedure.query(async ({ ctx }) => {
+    const { workspaceIds } = ctx
+    if (!workspaceIds.length) return { total: 0, active: 0, delayed: 0, completed: 0, onHold: 0, dueSoon: [], byStatus: {} }
+
     const { data: projects } = await ctx.supabase
       .from('projects')
       .select('id, code, name, status, kanban_stage, priority, end_date, health_score, progress_pct, color')
+      .in('workspace_id', workspaceIds)
 
     if (!projects) return { total: 0, active: 0, delayed: 0, completed: 0, onHold: 0, dueSoon: [], byStatus: {} }
 

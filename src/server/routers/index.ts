@@ -5,6 +5,7 @@ import { teamRouter } from './team'
 import { auditRouter } from './audit'
 import { searchRouter } from './search'
 import { notificationsRouter } from './notifications'
+import { commentsRouter } from './comments'
 
 export const appRouter = createTRPCRouter({
   projects: projectsRouter,
@@ -13,6 +14,7 @@ export const appRouter = createTRPCRouter({
   audit: auditRouter,
   search: searchRouter,
   notifications: notificationsRouter,
+  comments: commentsRouter,
 })
 
 export type AppRouter = typeof appRouter
