@@ -17,7 +17,7 @@ export function MobileNav() {
   const pathname = usePathname()
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-slate-200 bg-white/95 backdrop-blur-sm md:hidden">
+    <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-slate-200 bg-white/95 backdrop-blur-sm md:hidden dark:border-slate-800 dark:bg-slate-900/95">
       <div className="flex items-center justify-around px-1 pb-safe">
         {navItems.map(({ href, label, icon: Icon }) => {
           const active = href === '/dashboard'
@@ -30,14 +30,14 @@ export function MobileNav() {
               className={cn(
                 'relative flex flex-1 flex-col items-center gap-0.5 px-1 py-2.5 text-[10px] font-medium transition-colors',
                 active
-                  ? 'text-indigo-600'
-                  : 'text-slate-500 active:text-slate-700'
+                  ? 'text-indigo-600 dark:text-indigo-400'
+                  : 'text-slate-500 active:text-slate-700 dark:text-slate-500 dark:active:text-slate-300'
               )}
             >
               <Icon className={cn('h-5 w-5 shrink-0', active && 'drop-shadow-sm')} />
               <span>{label}</span>
               {active && (
-                <span className="absolute top-0 left-1/2 -translate-x-1/2 h-0.5 w-8 rounded-full bg-indigo-600" />
+                <span className="absolute top-0 left-1/2 -translate-x-1/2 h-0.5 w-8 rounded-full bg-indigo-600 dark:bg-indigo-400" />
               )}
             </Link>
           )

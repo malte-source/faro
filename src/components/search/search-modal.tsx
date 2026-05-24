@@ -33,18 +33,6 @@ export function SearchModal({ compact }: SearchModalProps = {}) {
     return () => clearTimeout(t)
   }, [query])
 
-  // Keyboard shortcut Cmd/Ctrl+K
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-        e.preventDefault()
-        setOpen(true)
-      }
-    }
-    document.addEventListener('keydown', handler)
-    return () => document.removeEventListener('keydown', handler)
-  }, [])
-
   // Focus input when opening
   useEffect(() => {
     if (open) {
@@ -80,7 +68,7 @@ export function SearchModal({ compact }: SearchModalProps = {}) {
         // Icon-only button for mobile header
         <button
           onClick={() => setOpen(true)}
-          className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+          className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:text-slate-500 dark:hover:bg-slate-800 dark:hover:text-slate-300"
           title="Buscar (⌘K)"
         >
           <Search className="h-4 w-4" />
@@ -89,11 +77,11 @@ export function SearchModal({ compact }: SearchModalProps = {}) {
         // Full trigger for sidebar
         <button
           onClick={() => setOpen(true)}
-          className="mx-2 mb-1 flex items-center gap-2.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-left text-sm text-slate-400 transition-all hover:border-slate-300 hover:bg-white hover:text-slate-500"
+          className="mx-2 mb-1 flex items-center gap-2.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-left text-sm text-slate-400 transition-all hover:border-slate-300 hover:bg-white hover:text-slate-500 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-500 dark:hover:border-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-400"
         >
           <Search className="h-3.5 w-3.5 shrink-0" />
           <span className="flex-1">Buscar...</span>
-          <kbd className="rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-slate-400 shadow-sm">
+          <kbd className="rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-slate-400 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-500">
             ⌘K
           </kbd>
         </button>
@@ -109,22 +97,22 @@ export function SearchModal({ compact }: SearchModalProps = {}) {
           />
 
           {/* Panel */}
-          <div className="relative z-10 w-full max-w-xl overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-slate-200">
+          <div className="relative z-10 w-full max-w-xl overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700">
             {/* Input row */}
-            <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-3.5">
-              <Search className="h-4 w-4 shrink-0 text-slate-400" />
+            <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-3.5 dark:border-slate-800">
+              <Search className="h-4 w-4 shrink-0 text-slate-400 dark:text-slate-500" />
               <input
                 ref={inputRef}
                 value={query}
                 onChange={e => setQuery(e.target.value)}
                 onKeyDown={e => e.key === 'Escape' && close()}
                 placeholder="Buscar proyectos, tareas..."
-                className="flex-1 bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
+                className="flex-1 bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400 dark:text-slate-100 dark:placeholder:text-slate-600"
               />
-              {isFetching && <Loader2 className="h-4 w-4 shrink-0 animate-spin text-slate-400" />}
+              {isFetching && <Loader2 className="h-4 w-4 shrink-0 animate-spin text-slate-400 dark:text-slate-500" />}
               <button
                 onClick={close}
-                className="flex h-6 w-6 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                className="flex h-6 w-6 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:text-slate-500 dark:hover:bg-slate-800 dark:hover:text-slate-300"
               >
                 <X className="h-3.5 w-3.5" />
               </button>
@@ -133,23 +121,23 @@ export function SearchModal({ compact }: SearchModalProps = {}) {
             {/* Results */}
             <div className="max-h-[380px] overflow-y-auto">
               {!isSearching && (
-                <div className="flex flex-col items-center justify-center gap-1.5 py-10 text-slate-400">
-                  <Search className="h-7 w-7 text-slate-200" />
+                <div className="flex flex-col items-center justify-center gap-1.5 py-10 text-slate-400 dark:text-slate-500">
+                  <Search className="h-7 w-7 text-slate-200 dark:text-slate-700" />
                   <p className="text-sm">Escribí al menos 2 caracteres para buscar</p>
                 </div>
               )}
 
               {isSearching && !isFetching && !hasResults && (
-                <div className="flex flex-col items-center justify-center gap-1.5 py-10 text-slate-400">
-                  <p className="text-sm">Sin resultados para <strong className="text-slate-600">"{debouncedQuery}"</strong></p>
+                <div className="flex flex-col items-center justify-center gap-1.5 py-10 text-slate-400 dark:text-slate-500">
+                  <p className="text-sm">Sin resultados para <strong className="text-slate-600 dark:text-slate-400">"{debouncedQuery}"</strong></p>
                 </div>
               )}
 
               {hasProjects && (
                 <div>
                   <div className="flex items-center gap-2 px-4 py-2.5">
-                    <FolderKanban className="h-3.5 w-3.5 text-slate-400" />
-                    <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Proyectos</span>
+                    <FolderKanban className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
+                    <span className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Proyectos</span>
                   </div>
                   {data!.projects.map(project => {
                     const statusInfo = PROJECT_STATUS[project.status as keyof typeof PROJECT_STATUS]
@@ -157,14 +145,14 @@ export function SearchModal({ compact }: SearchModalProps = {}) {
                       <button
                         key={project.id}
                         onClick={() => navigate(`/dashboard/projects/${project.id}`)}
-                        className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-indigo-50"
+                        className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-indigo-50 dark:hover:bg-indigo-950/50"
                       >
                         <div
                           className="h-2.5 w-2.5 shrink-0 rounded-full"
                           style={{ backgroundColor: project.color }}
                         />
-                        <span className="text-xs font-medium text-slate-400">{project.code}</span>
-                        <span className="flex-1 truncate text-sm text-slate-800">{project.name}</span>
+                        <span className="text-xs font-medium text-slate-400 dark:text-slate-500">{project.code}</span>
+                        <span className="flex-1 truncate text-sm text-slate-800 dark:text-slate-200">{project.name}</span>
                         {statusInfo && (
                           <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${statusInfo.color}`}>
                             {statusInfo.label}
@@ -177,10 +165,10 @@ export function SearchModal({ compact }: SearchModalProps = {}) {
               )}
 
               {hasTasks && (
-                <div className={hasProjects ? 'border-t border-slate-100' : ''}>
+                <div className={hasProjects ? 'border-t border-slate-100 dark:border-slate-800' : ''}>
                   <div className="flex items-center gap-2 px-4 py-2.5">
-                    <CheckSquare className="h-3.5 w-3.5 text-slate-400" />
-                    <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Tareas</span>
+                    <CheckSquare className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
+                    <span className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Tareas</span>
                   </div>
                   {data!.tasks.map(task => {
                     const priorityInfo = PRIORITY[task.priority as keyof typeof PRIORITY]
@@ -189,14 +177,14 @@ export function SearchModal({ compact }: SearchModalProps = {}) {
                       <button
                         key={task.id}
                         onClick={() => projectData ? navigate(`/dashboard/projects/${projectData.id}`) : undefined}
-                        className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-indigo-50"
+                        className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-indigo-50 dark:hover:bg-indigo-950/50"
                       >
                         <div
                           className={`h-2 w-2 shrink-0 rounded-full ${priorityInfo?.dot ?? 'bg-slate-300'}`}
                         />
-                        <span className="flex-1 truncate text-sm text-slate-800">{task.title}</span>
+                        <span className="flex-1 truncate text-sm text-slate-800 dark:text-slate-200">{task.title}</span>
                         {projectData && (
-                          <span className="flex items-center gap-1 text-[11px] text-slate-400">
+                          <span className="flex items-center gap-1 text-[11px] text-slate-400 dark:text-slate-500">
                             <span
                               className="inline-block h-1.5 w-1.5 rounded-full"
                               style={{ backgroundColor: projectData.color }}
@@ -204,7 +192,7 @@ export function SearchModal({ compact }: SearchModalProps = {}) {
                             {projectData.code}
                           </span>
                         )}
-                        <span className="text-[11px] text-slate-400">
+                        <span className="text-[11px] text-slate-400 dark:text-slate-500">
                           {TASK_STATUS_LABEL[task.status as TaskStatus] ?? task.status}
                         </span>
                       </button>
@@ -215,9 +203,9 @@ export function SearchModal({ compact }: SearchModalProps = {}) {
 
               {/* Footer hint */}
               {hasResults && (
-                <div className="border-t border-slate-100 px-4 py-2 text-[11px] text-slate-400">
-                  Presioná <kbd className="rounded border border-slate-200 px-1 py-0.5">↵ Enter</kbd> para navegar
-                  · <kbd className="rounded border border-slate-200 px-1 py-0.5">Esc</kbd> para cerrar
+                <div className="border-t border-slate-100 px-4 py-2 text-[11px] text-slate-400 dark:border-slate-800 dark:text-slate-500">
+                  Presioná <kbd className="rounded border border-slate-200 px-1 py-0.5 dark:border-slate-700">↵ Enter</kbd> para navegar
+                  · <kbd className="rounded border border-slate-200 px-1 py-0.5 dark:border-slate-700">Esc</kbd> para cerrar
                 </div>
               )}
             </div>

@@ -97,16 +97,16 @@ export function QuickCreateModal({ open, onClose }: QuickCreateModalProps) {
 
       {/* Modal */}
       <div className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 px-4">
-        <div className="rounded-2xl border border-slate-200 bg-white shadow-2xl">
+        <div className="rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
           {/* Header */}
-          <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+          <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 dark:border-slate-800">
             <div className="flex items-center gap-2">
-              <Plus className="h-4 w-4 text-indigo-600" />
-              <span className="text-sm font-semibold text-slate-800">Nueva tarea</span>
+              <Plus className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+              <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">Nueva tarea</span>
             </div>
             <button
               onClick={resetAndClose}
-              className="rounded-lg p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+              className="rounded-lg p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 dark:text-slate-500 dark:hover:bg-slate-800 dark:hover:text-slate-300"
             >
               <X className="h-4 w-4" />
             </button>
@@ -122,19 +122,19 @@ export function QuickCreateModal({ open, onClose }: QuickCreateModalProps) {
                 value={title}
                 onChange={e => setTitle(e.target.value)}
                 placeholder="¿Qué hay que hacer?"
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium placeholder:text-slate-400 focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-all"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium placeholder:text-slate-400 focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-all dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-indigo-500 dark:focus:bg-slate-800"
               />
             </div>
 
             {/* Project */}
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-slate-500">Proyecto</label>
+              <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Proyecto</label>
               <div className="relative">
                 <select
                   value={projectId}
                   onChange={e => setProjectId(e.target.value)}
                   required
-                  className="w-full appearance-none rounded-xl border border-slate-200 bg-white px-4 py-2.5 pr-8 text-sm text-slate-700 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-all"
+                  className="w-full appearance-none rounded-xl border border-slate-200 bg-white px-4 py-2.5 pr-8 text-sm text-slate-700 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-all dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
                 >
                   <option value="" disabled>Seleccionar proyecto…</option>
                   {activeProjects.map(p => (
@@ -148,12 +148,12 @@ export function QuickCreateModal({ open, onClose }: QuickCreateModalProps) {
             {/* Priority + Status row */}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-slate-500">Prioridad</label>
+                <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Prioridad</label>
                 <div className="relative">
                   <select
                     value={priority}
                     onChange={e => setPriority(e.target.value as typeof priority)}
-                    className="w-full appearance-none rounded-xl border border-slate-200 bg-white px-3 py-2.5 pr-7 text-xs text-slate-700 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-all"
+                    className="w-full appearance-none rounded-xl border border-slate-200 bg-white px-3 py-2.5 pr-7 text-xs text-slate-700 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-all dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
                   >
                     {PRIORITY_OPTIONS.map(o => (
                       <option key={o.value} value={o.value}>{o.label}</option>
@@ -164,12 +164,12 @@ export function QuickCreateModal({ open, onClose }: QuickCreateModalProps) {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-slate-500">Estado inicial</label>
+                <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Estado inicial</label>
                 <div className="relative">
                   <select
                     value={status}
                     onChange={e => setStatus(e.target.value as 'todo' | 'in_progress')}
-                    className="w-full appearance-none rounded-xl border border-slate-200 bg-white px-3 py-2.5 pr-7 text-xs text-slate-700 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-all"
+                    className="w-full appearance-none rounded-xl border border-slate-200 bg-white px-3 py-2.5 pr-7 text-xs text-slate-700 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-all dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
                   >
                     <option value="todo">Por hacer</option>
                     <option value="in_progress">En progreso</option>
@@ -181,25 +181,25 @@ export function QuickCreateModal({ open, onClose }: QuickCreateModalProps) {
 
             {/* Due date */}
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-slate-500">Vencimiento (opcional)</label>
+              <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Vencimiento (opcional)</label>
               <input
                 type="date"
                 value={dueDate}
                 onChange={e => setDueDate(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-700 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-all"
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-700 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-all dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
               />
             </div>
 
             {/* Actions */}
-            <div className="flex items-center justify-between pt-1 border-t border-slate-100">
-              <p className="text-[11px] text-slate-400">
-                <kbd className="rounded border border-slate-200 px-1 py-0.5 text-[10px] font-mono">Esc</kbd> para cerrar
+            <div className="flex items-center justify-between pt-1 border-t border-slate-100 dark:border-slate-800">
+              <p className="text-[11px] text-slate-400 dark:text-slate-500">
+                <kbd className="rounded border border-slate-200 px-1 py-0.5 text-[10px] font-mono dark:border-slate-700">Esc</kbd> para cerrar
               </p>
               <div className="flex gap-2">
                 <button
                   type="button"
                   onClick={resetAndClose}
-                  className="rounded-xl px-4 py-2 text-xs font-medium text-slate-500 hover:bg-slate-100 transition-colors"
+                  className="rounded-xl px-4 py-2 text-xs font-medium text-slate-500 hover:bg-slate-100 transition-colors dark:text-slate-400 dark:hover:bg-slate-800"
                 >
                   Cancelar
                 </button>

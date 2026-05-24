@@ -15,12 +15,17 @@ import {
   CalendarDays,
   Plus,
   BarChart3,
+  Sun,
+  Moon,
+  Monitor,
+  Search,
 } from 'lucide-react'
+import { useTheme } from 'next-themes'
 import { cn } from '@/lib/utils'
 import { logout } from '@/app/actions/auth'
-import { SearchModal } from '@/components/search/search-modal'
 import { NotificationsPanel } from '@/components/notifications/notifications-panel'
 import { QuickCreateModal } from '@/components/tasks/quick-create-modal'
+import { openCommandPalette } from '@/components/command/command-palette'
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -41,6 +46,15 @@ interface SidebarProps {
 export function Sidebar({ userName, userEmail, userAvatar }: SidebarProps) {
   const pathname = usePathname()
   const [quickCreate, setQuickCreate] = useState(false)
+  const { theme, setTheme } = useTheme()
+
+  const nextTheme = () => {
+    if (theme === 'light') setTheme('dark')
+    else if (theme === 'dark') setTheme('system')
+    else setTheme('light')
+  }
+
+  const ThemeIcon = theme === 'dark' ? Moon : theme === 'light' ? Sun : Monitor
 
   // Keyboard shortcut: press 'n' when not focused on an input to open quick create
   useEffect(() => {
@@ -64,29 +78,40 @@ export function Sidebar({ userName, userEmail, userAvatar }: SidebarProps) {
     .toUpperCase() ?? '?'
 
   return (
-    <aside className="flex h-screen w-60 shrink-0 flex-col border-r border-slate-200 bg-white">
+    <aside className="flex h-screen w-60 shrink-0 flex-col border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
       {/* Logo */}
-      <div className="flex h-14 items-center gap-2.5 border-b border-slate-100 px-4">
+      <div className="flex h-14 items-center gap-2.5 border-b border-slate-100 px-4 dark:border-slate-800">
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600">
           <Anchor className="h-4 w-4 text-white" />
         </div>
-        <span className="text-base font-bold tracking-tight text-slate-900">Faro</span>
+        <span className="text-base font-bold tracking-tight text-slate-900 dark:text-slate-100">Faro</span>
       </div>
 
-      {/* Search */}
-      <div className="px-0 py-2 border-b border-slate-100">
-        <SearchModal />
+      {/* Search / Command Palette trigger */}
+      <div className="px-2 py-2 border-b border-slate-100 dark:border-slate-800">
+        <button
+          data-tour="search-trigger"
+          onClick={openCommandPalette}
+          className="flex w-full items-center gap-2.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-left text-sm text-slate-400 transition-all hover:border-slate-300 hover:bg-white hover:text-slate-500 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-500 dark:hover:border-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-400"
+        >
+          <Search className="h-3.5 w-3.5 shrink-0" />
+          <span className="flex-1 text-xs">Buscar o comandos…</span>
+          <kbd className="rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-slate-400 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-500">
+            ⌘K
+          </kbd>
+        </button>
       </div>
 
       {/* Quick create */}
       <div className="px-2 pt-2 pb-1">
         <button
+          data-tour="quick-create"
           onClick={() => setQuickCreate(true)}
-          className="flex w-full items-center gap-2.5 rounded-lg border border-dashed border-slate-300 px-3 py-2 text-xs font-medium text-slate-500 transition-colors hover:border-indigo-400 hover:bg-indigo-50 hover:text-indigo-600"
+          className="flex w-full items-center gap-2.5 rounded-lg border border-dashed border-slate-300 px-3 py-2 text-xs font-medium text-slate-500 transition-colors hover:border-indigo-400 hover:bg-indigo-50 hover:text-indigo-600 dark:border-slate-700 dark:text-slate-400 dark:hover:border-indigo-500 dark:hover:bg-indigo-950 dark:hover:text-indigo-400"
         >
           <Plus className="h-3.5 w-3.5" />
           <span>Nueva tarea</span>
-          <kbd className="ml-auto rounded border border-slate-200 bg-slate-100 px-1 py-0.5 text-[10px] font-mono text-slate-400">N</kbd>
+          <kbd className="ml-auto rounded border border-slate-200 bg-slate-100 px-1 py-0.5 text-[10px] font-mono text-slate-400 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-500">N</kbd>
         </button>
       </div>
 
@@ -104,8 +129,8 @@ export function Sidebar({ userName, userEmail, userAvatar }: SidebarProps) {
                   className={cn(
                     'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
                     active
-                      ? 'bg-indigo-50 text-indigo-700'
-                      : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                      ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-400'
+                      : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100'
                   )}
                 >
                   <Icon className="h-4 w-4 shrink-0" />
@@ -116,14 +141,14 @@ export function Sidebar({ userName, userEmail, userAvatar }: SidebarProps) {
           })}
         </ul>
 
-        <div className="mt-6 border-t border-slate-100 pt-4">
+        <div className="mt-6 border-t border-slate-100 pt-4 dark:border-slate-800">
           <Link
             href="/dashboard/settings"
             className={cn(
               'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
               pathname.startsWith('/dashboard/settings')
-                ? 'bg-indigo-50 text-indigo-700'
-                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-400'
+                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100'
             )}
           >
             <Settings className="h-4 w-4 shrink-0" />
@@ -133,7 +158,7 @@ export function Sidebar({ userName, userEmail, userAvatar }: SidebarProps) {
       </nav>
 
       {/* User */}
-      <div className="border-t border-slate-100 p-3">
+      <div className="border-t border-slate-100 p-3 dark:border-slate-800">
         <div className="flex items-center gap-3 rounded-lg px-2 py-2">
           {userAvatar ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -143,20 +168,27 @@ export function Sidebar({ userName, userEmail, userAvatar }: SidebarProps) {
               className="h-8 w-8 rounded-full object-cover"
             />
           ) : (
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-100 text-xs font-semibold text-indigo-700">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-100 text-xs font-semibold text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300">
               {initials}
             </div>
           )}
           <div className="min-w-0 flex-1">
-            <p className="truncate text-xs font-medium text-slate-900">{userName}</p>
-            <p className="truncate text-xs text-slate-400">{userEmail}</p>
+            <p className="truncate text-xs font-medium text-slate-900 dark:text-slate-100">{userName}</p>
+            <p className="truncate text-xs text-slate-400 dark:text-slate-500">{userEmail}</p>
           </div>
+          <button
+            onClick={nextTheme}
+            className="rounded-md p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 dark:text-slate-500 dark:hover:bg-slate-800 dark:hover:text-slate-300"
+            title={`Tema: ${theme}`}
+          >
+            <ThemeIcon className="h-4 w-4" />
+          </button>
           <NotificationsPanel />
           <QuickCreateModal open={quickCreate} onClose={() => setQuickCreate(false)} />
           <form action={logout}>
             <button
               type="submit"
-              className="rounded-md p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+              className="rounded-md p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 dark:text-slate-500 dark:hover:bg-slate-800 dark:hover:text-slate-300"
               title="Cerrar sesión"
             >
               <LogOut className="h-4 w-4" />

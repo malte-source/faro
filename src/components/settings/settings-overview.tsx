@@ -9,9 +9,11 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { User, Building2, Check } from 'lucide-react'
+import { User, Building2, Check, HelpCircle } from 'lucide-react'
 
-type Tab = 'profile' | 'org'
+const TOUR_STORAGE_KEY = 'faro:onboarding:v1'
+
+type Tab = 'profile' | 'org' | 'help'
 
 const PLAN_LABELS: Record<string, string> = {
   free: 'Free', team: 'Team', business: 'Business', enterprise: 'Enterprise',
@@ -53,9 +55,19 @@ export function SettingsOverview() {
     updateMember.mutate({ userId: me.id, name: name.trim(), position: position.trim() || null })
   }
 
+  const [tourRestarted, setTourRestarted] = useState(false)
+
+  function restartTour() {
+    localStorage.removeItem(TOUR_STORAGE_KEY)
+    setTourRestarted(true)
+    // Trigger reload so tour picks up fresh state
+    window.location.reload()
+  }
+
   const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
     { id: 'profile', label: 'Mi perfil', icon: <User className="h-4 w-4" /> },
     { id: 'org', label: 'Organización', icon: <Building2 className="h-4 w-4" /> },
+    { id: 'help', label: 'Ayuda', icon: <HelpCircle className="h-4 w-4" /> },
   ]
 
   return (
@@ -116,6 +128,45 @@ export function SettingsOverview() {
                 <><Check className="h-4 w-4" /> Guardado</>
               ) : updateMember.isPending ? 'Guardando…' : 'Guardar cambios'}
             </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Help tab */}
+      {tab === 'help' && (
+        <div className="space-y-4">
+          <div className="rounded-xl border border-slate-200 bg-white p-6 space-y-4">
+            <h3 className="text-sm font-semibold text-slate-700">Tour de bienvenida</h3>
+            <p className="text-sm text-slate-500">
+              Volvé a ver el tour interactivo que explica las funciones principales de Faro.
+            </p>
+            <button
+              onClick={restartTour}
+              disabled={tourRestarted}
+              className="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-indigo-700 disabled:opacity-60"
+            >
+              <HelpCircle className="h-4 w-4" />
+              {tourRestarted ? 'Recargando…' : 'Reiniciar tour'}
+            </button>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-white p-6 space-y-3">
+            <h3 className="text-sm font-semibold text-slate-700">Atajos de teclado</h3>
+            <div className="space-y-2 text-sm">
+              {[
+                ['⌘K', 'Abrir paleta de comandos'],
+                ['N', 'Nueva tarea rápida'],
+                ['G D', 'Ir al Dashboard'],
+                ['G P', 'Ir a Proyectos'],
+                ['G K', 'Ir al Kanban'],
+                ['G T', 'Ir a Tareas'],
+              ].map(([kbd, desc]) => (
+                <div key={kbd} className="flex items-center justify-between py-1.5 border-b border-slate-50">
+                  <span className="text-slate-600">{desc}</span>
+                  <kbd className="rounded border border-slate-200 bg-slate-100 px-2 py-0.5 text-xs font-mono text-slate-500">{kbd}</kbd>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}

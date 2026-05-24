@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* Tailwind v4 — class-based dark mode via next-themes */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
@@ -12,11 +15,10 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* Dark mode via .dark class (next-themes) */
+.dark {
+  --background: #0f172a;
+  --foreground: #f1f5f9;
 }
 
 body {

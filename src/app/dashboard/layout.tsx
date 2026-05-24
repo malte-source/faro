@@ -5,6 +5,8 @@ import { MobileNav } from '@/components/layout/mobile-nav'
 import { MobileHeader } from '@/components/layout/mobile-header'
 import { PwaInstallBanner } from '@/components/pwa/install-banner'
 import { MobileFAB } from '@/components/pwa/mobile-fab'
+import { CommandPalette } from '@/components/command/command-palette'
+import { OnboardingTour } from '@/components/onboarding/onboarding-tour'
 
 export default async function DashboardLayout({
   children,
@@ -15,7 +17,7 @@ export default async function DashboardLayout({
   if (!session?.user) redirect('/login')
 
   return (
-    <div className="flex h-screen overflow-hidden bg-slate-50">
+    <div className="flex h-screen overflow-hidden bg-slate-50 dark:bg-slate-950">
       {/* Sidebar — visible on md+ */}
       <div className="hidden md:flex">
         <Sidebar
@@ -46,6 +48,12 @@ export default async function DashboardLayout({
 
       {/* PWA install prompt — shown when browser fires beforeinstallprompt */}
       <PwaInstallBanner />
+
+      {/* Command palette — Cmd+K */}
+      <CommandPalette />
+
+      {/* Onboarding tour — shows once for new users */}
+      <OnboardingTour />
     </div>
   )
 }
