@@ -5,39 +5,27 @@ export const searchRouter = createTRPCRouter({
   global: protectedProcedure
     .input(z.string().min(1).max(100))
     .query(async ({ ctx, input }) => {
-      const { data: me } = await ctx.supabase
-        .from('users')
-        .select('id, org_id')
-        .eq('email', ctx.session.user.email!)
-        .single()
-      if (!me) return { projects: [], tasks: [] }
+      const { workspaceIds } = ctx
+      if (!workspaceIds.length) return { projects: [], tasks: [] }
 
       const q = `%${input.trim()}%`
 
-      // Get workspace IDs for this org
-      const { data: workspaces } = await ctx.supabase
-        .from('workspaces')
-        .select('id')
-        .eq('org_id', me.org_id)
-      const wsIds = workspaces?.map(w => w.id) ?? []
-      if (!wsIds.length) return { projects: [], tasks: [] }
+      // Search projects by name/code AND fetch all project IDs in parallel
+      const [{ data: projects }, { data: allProjects }] = await Promise.all([
+        ctx.supabase
+          .from('projects')
+          .select('id, code, name, status, color')
+          .in('workspace_id', workspaceIds)
+          .or(`name.ilike.${q},code.ilike.${q}`)
+          .limit(6),
+        ctx.supabase
+          .from('projects')
+          .select('id')
+          .in('workspace_id', workspaceIds),
+      ])
 
-      // Search projects by name or code
-      const { data: projects } = await ctx.supabase
-        .from('projects')
-        .select('id, code, name, status, color')
-        .in('workspace_id', wsIds)
-        .or(`name.ilike.${q},code.ilike.${q}`)
-        .limit(6)
-
-      // Get all project IDs for task search
-      const { data: allProjects } = await ctx.supabase
-        .from('projects')
-        .select('id')
-        .in('workspace_id', wsIds)
       const projectIds = allProjects?.map(p => p.id) ?? []
 
-      // Search tasks by title
       const { data: tasks } = projectIds.length
         ? await ctx.supabase
             .from('tasks')

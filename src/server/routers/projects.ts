@@ -101,15 +101,9 @@ export const projectsRouter = createTRPCRouter({
       color: z.string().default('#6366f1'),
     }))
     .mutation(async ({ ctx, input }) => {
-      const { data: me } = await ctx.supabase
-        .from('users').select('id, org_id').eq('email', ctx.session.user.email!).single()
+      const { me, workspaceIds } = ctx
 
-      let workspaceId = input.workspaceId
-      if (!workspaceId) {
-        const { data: ws } = await ctx.supabase
-          .from('workspaces').select('id').eq('org_id', me?.org_id ?? '').limit(1).single()
-        workspaceId = ws?.id
-      }
+      const workspaceId = input.workspaceId ?? workspaceIds[0]
       if (!workspaceId) throw new Error('No workspace found')
 
       const { data, error } = await ctx.supabase
@@ -130,14 +124,14 @@ export const projectsRouter = createTRPCRouter({
           department_id: input.departmentId ?? null,
           color: input.color,
           progress_pct: 0,
-          created_by: me?.id ?? ctx.session.user.email!,
+          created_by: me.id,
         })
         .select()
         .single()
 
       if (error) throw error
 
-      if (me && data) {
+      if (data) {
         await logAudit(ctx.supabase, {
           orgId: me.org_id,
           entityType: 'project',
@@ -165,9 +159,7 @@ export const projectsRouter = createTRPCRouter({
     }))
     .mutation(async ({ ctx, input }) => {
       const { id, ...rest } = input
-
-      const { data: me } = await ctx.supabase
-        .from('users').select('id, org_id').eq('email', ctx.session.user.email!).single()
+      const { me } = ctx
 
       const { data: prev } = await ctx.supabase
         .from('projects').select('status, kanban_stage, progress_pct, name').eq('id', id).single()
@@ -216,8 +208,7 @@ export const projectsRouter = createTRPCRouter({
   delete: protectedProcedure
     .input(z.string())
     .mutation(async ({ ctx, input }) => {
-      const { data: me } = await ctx.supabase
-        .from('users').select('id, org_id').eq('email', ctx.session.user.email!).single()
+      const { me } = ctx
       const { data: proj } = await ctx.supabase
         .from('projects').select('name').eq('id', input).single()
 
@@ -298,12 +289,11 @@ export const projectsRouter = createTRPCRouter({
       role: z.enum(['lead', 'contributor', 'viewer']).default('contributor'),
     }))
     .mutation(async ({ ctx, input }) => {
-      const { data: me } = await ctx.supabase
-        .from('users').select('id').eq('email', ctx.session.user.email!).single()
+      const { me } = ctx
 
       const { data, error } = await ctx.supabase
         .from('project_members')
-        .insert({ project_id: input.projectId, user_id: input.userId, role: input.role, added_by: me?.id ?? input.userId })
+        .insert({ project_id: input.projectId, user_id: input.userId, role: input.role, added_by: me.id })
         .select(`id, role, joined_at, user:users(id, name, email, avatar_url, position)`)
         .single()
 

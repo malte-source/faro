@@ -39,7 +39,7 @@ export function ProjectsList() {
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [kanbanFilter, setKanbanFilter] = useState<string>('all')
 
-  const { data: projects, isLoading } = trpc.projects.list.useQuery(
+  const { data: projects, isLoading, error } = trpc.projects.list.useQuery(
     statusFilter !== 'all' || kanbanFilter !== 'all'
       ? {
           status: statusFilter !== 'all' ? (statusFilter as ProjectStatus) : undefined,
@@ -95,7 +95,13 @@ export function ProjectsList() {
       </div>
 
       {/* List */}
-      {isLoading ? (
+      {error ? (
+        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-red-200 bg-red-50 py-16 text-red-400">
+          <AlertCircle className="mb-2 h-6 w-6" />
+          <p className="text-sm font-medium">Error al cargar proyectos</p>
+          <p className="mt-1 text-xs text-red-300">Intentá recargar la página</p>
+        </div>
+      ) : isLoading ? (
         <div className="space-y-2">
           {[...Array(6)].map((_, i) => (
             <Card key={i} className="p-4">
@@ -117,9 +123,14 @@ export function ProjectsList() {
           <p className="text-sm font-medium">No hay proyectos</p>
           <p className="mt-1 text-xs">
             {statusFilter !== 'all' || kanbanFilter !== 'all'
-              ? 'Probá cambiando los filtros'
+              ? 'Ningún proyecto coincide con los filtros activos'
               : 'Creá el primer proyecto para empezar'}
           </p>
+          {statusFilter === 'all' && kanbanFilter === 'all' && (
+            <Link href="/dashboard/projects/new" className="mt-4">
+              <Button size="sm"><Plus className="h-4 w-4" />Nuevo proyecto</Button>
+            </Link>
+          )}
         </div>
       ) : (
         <div className="space-y-2">

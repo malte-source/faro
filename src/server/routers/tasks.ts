@@ -11,15 +11,10 @@ export const tasksRouter = createTRPCRouter({
       onlyMine: z.boolean().optional(),
     }).optional())
     .query(async ({ ctx, input }) => {
-      const { data: me } = await ctx.supabase
-        .from('users').select('id, org_id').eq('email', ctx.session.user.email!).single()
-      if (!me) return []
+      const { me, workspaceIds } = ctx
+      if (!workspaceIds.length) return []
 
-      const { data: workspaces } = await ctx.supabase
-        .from('workspaces').select('id').eq('org_id', me.org_id)
-      const wsIds = workspaces?.map(w => w.id) ?? []
-
-      let projectQuery = ctx.supabase.from('projects').select('id').in('workspace_id', wsIds)
+      let projectQuery = ctx.supabase.from('projects').select('id').in('workspace_id', workspaceIds)
       if (input?.projectId) projectQuery = projectQuery.eq('id', input.projectId)
       const { data: projects } = await projectQuery
       const projectIds = projects?.map(p => p.id) ?? []
@@ -35,6 +30,7 @@ export const tasksRouter = createTRPCRouter({
         .in('project_id', projectIds)
         .is('parent_task_id', null)
         .order('created_at', { ascending: false })
+        .limit(200)
 
       if (input?.status) query = query.eq('status', input.status)
       if (input?.priority) query = query.eq('priority', input.priority)
@@ -59,6 +55,7 @@ export const tasksRouter = createTRPCRouter({
         .eq('project_id', input)
         .is('parent_task_id', null)
         .order('position')
+        .limit(500)
 
       if (error) throw error
       return data
@@ -78,11 +75,7 @@ export const tasksRouter = createTRPCRouter({
       status: z.enum(['todo', 'in_progress', 'in_review', 'done', 'canceled']).default('todo'),
     }))
     .mutation(async ({ ctx, input }) => {
-      const { data: me } = await ctx.supabase
-        .from('users')
-        .select('id')
-        .eq('email', ctx.session.user.email!)
-        .single()
+      const { me } = ctx
 
       const { data: lastTask } = await ctx.supabase
         .from('tasks')
@@ -99,7 +92,7 @@ export const tasksRouter = createTRPCRouter({
           title: input.title,
           description: input.description ?? null,
           assignee_id: input.assigneeId ?? null,
-          reporter_id: me?.id ?? ctx.session.user.email!,
+          reporter_id: me.id,
           priority: input.priority,
           status: input.status,
           due_date: input.dueDate,

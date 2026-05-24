@@ -3,13 +3,7 @@ import { createTRPCRouter, protectedProcedure } from '@/lib/trpc/server'
 
 export const teamRouter = createTRPCRouter({
   members: protectedProcedure.query(async ({ ctx }) => {
-    const { data: me } = await ctx.supabase
-      .from('users')
-      .select('org_id')
-      .eq('email', ctx.session.user.email!)
-      .single()
-
-    if (!me) return []
+    const { me } = ctx
 
     const { data, error } = await ctx.supabase
       .from('users')
@@ -37,13 +31,7 @@ export const teamRouter = createTRPCRouter({
       departmentId: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      const { data: me } = await ctx.supabase
-        .from('users')
-        .select('org_id')
-        .eq('email', ctx.session.user.email!)
-        .single()
-
-      if (!me) throw new Error('User not found')
+      const { me } = ctx
 
       const { data, error } = await ctx.supabase
         .from('users')
@@ -63,13 +51,7 @@ export const teamRouter = createTRPCRouter({
     }),
 
   departments: protectedProcedure.query(async ({ ctx }) => {
-    const { data: me } = await ctx.supabase
-      .from('users')
-      .select('org_id')
-      .eq('email', ctx.session.user.email!)
-      .single()
-
-    if (!me) return []
+    const { me } = ctx
 
     const { data, error } = await ctx.supabase
       .from('departments')
@@ -116,13 +98,7 @@ export const teamRouter = createTRPCRouter({
     }),
 
   workload: protectedProcedure.query(async ({ ctx }) => {
-    const { data: me } = await ctx.supabase
-      .from('users')
-      .select('org_id')
-      .eq('email', ctx.session.user.email!)
-      .single()
-
-    if (!me) return []
+    const { me } = ctx
 
     const { data } = await ctx.supabase
       .from('users')

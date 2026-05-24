@@ -48,7 +48,20 @@ export function TasksOverview() {
   const utils = trpc.useUtils()
 
   const updateTask = trpc.tasks.update.useMutation({
-    onSuccess: () => utils.tasks.list.invalidate(),
+    onMutate: async (input) => {
+      await utils.tasks.list.cancel()
+      const prev = utils.tasks.list.getData()
+      utils.tasks.list.setData(
+        { status: statusFilter !== 'all' ? statusFilter as TaskStatus : undefined,
+          priority: priorityFilter !== 'all' ? priorityFilter as 'very_high' | 'high' | 'medium' | 'low' | 'very_low' : undefined,
+          projectId: projectFilter !== 'all' ? projectFilter : undefined,
+          onlyMine: view === 'mine' },
+        (old) => old?.map(t => t.id === input.id ? { ...t, ...(input.status && { status: input.status }) } : t) ?? []
+      )
+      return { prev }
+    },
+    onError: () => utils.tasks.list.invalidate(),
+    onSettled: () => utils.tasks.list.invalidate(),
   })
 
   const hasFilters = statusFilter !== 'all' || priorityFilter !== 'all' || projectFilter !== 'all'
@@ -130,10 +143,24 @@ export function TasksOverview() {
 
       {/* Table */}
       {isLoading ? (
-        <div className="space-y-2">
-          {[...Array(6)].map((_, i) => (
-            <div key={i} className="h-12 rounded-lg bg-slate-100 animate-pulse" />
-          ))}
+        <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+          <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-x-4 border-b border-slate-100 px-4 py-2.5">
+            <div className="h-3 w-10 rounded bg-slate-100 animate-pulse" />
+          </div>
+          <div className="divide-y divide-slate-50">
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-x-4 items-center px-4 py-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="h-2 w-2 rounded-full bg-slate-100 animate-pulse shrink-0" />
+                  <div className="h-3.5 rounded bg-slate-100 animate-pulse" style={{ width: `${140 + (i % 3) * 40}px` }} />
+                </div>
+                <div className="hidden sm:block w-32 h-3 rounded bg-slate-100 animate-pulse" />
+                <div className="hidden md:block w-24 h-5 w-5 rounded-full bg-slate-100 animate-pulse mx-auto" />
+                <div className="hidden sm:block w-28 h-3 rounded bg-slate-100 animate-pulse" />
+                <div className="w-32 h-7 rounded-md bg-slate-100 animate-pulse" />
+              </div>
+            ))}
+          </div>
         </div>
       ) : !tasks?.length ? (
         <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white py-20 text-slate-400">

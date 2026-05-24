@@ -7,7 +7,15 @@ import { trpc } from '@/lib/trpc/client'
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(() => new QueryClient({
-    defaultOptions: { queries: { staleTime: 30 * 1000 } },
+    defaultOptions: {
+      queries: {
+        staleTime: 5 * 60 * 1000,    // 5 min — avoid unnecessary refetches
+        gcTime: 15 * 60 * 1000,      // 15 min in memory cache
+        retry: 1,
+        refetchOnWindowFocus: false,  // Don't hammer the server on every tab switch
+        refetchOnReconnect: true,
+      },
+    },
   }))
 
   const [trpcClient] = useState(() =>
@@ -15,6 +23,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
       links: [
         httpBatchLink({
           url: `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/api/trpc`,
+          maxURLLength: 2083,
         }),
       ],
     })
