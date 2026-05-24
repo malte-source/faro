@@ -1,31 +1,53 @@
 -- ═══════════════════════════════════════════════════════════════
--- FARO — Schema inicial (Fase 0)
--- Multi-tenant SaaS con Row Level Security
+-- FARO — Schema inicial (Fase 0)  — IDEMPOTENTE (puede correr N veces)
 -- ═══════════════════════════════════════════════════════════════
 
 -- Extensiones
 create extension if not exists "uuid-ossp";
 
 -- ───────────────────────────────────────────────
--- TIPOS ENUM
+-- TIPOS ENUM  (DO/EXCEPTION para idempotencia)
 -- ───────────────────────────────────────────────
-create type project_status as enum (
-  'not_started','in_progress','on_hold','delayed','completed','canceled','pending'
-);
-create type kanban_stage as enum (
-  'ideas','backlog','pending','in_progress','on_hold','completed','canceled'
-);
-create type priority_level as enum ('very_high','high','medium','low','very_low');
-create type user_role as enum ('owner','admin','manager','member','viewer','guest');
-create type project_member_role as enum ('lead','contributor','viewer');
-create type org_plan as enum ('free','team','business','enterprise');
-create type audit_source as enum ('app','sheets','api','ai','chat_bot','email');
-create type task_status as enum ('todo','in_progress','in_review','done','canceled');
+do $$ begin
+  create type project_status as enum (
+    'not_started','in_progress','on_hold','delayed','completed','canceled','pending'
+  );
+exception when duplicate_object then null; end $$;
+
+do $$ begin
+  create type kanban_stage as enum (
+    'ideas','backlog','pending','in_progress','on_hold','completed','canceled'
+  );
+exception when duplicate_object then null; end $$;
+
+do $$ begin
+  create type priority_level as enum ('very_high','high','medium','low','very_low');
+exception when duplicate_object then null; end $$;
+
+do $$ begin
+  create type user_role as enum ('owner','admin','manager','member','viewer','guest');
+exception when duplicate_object then null; end $$;
+
+do $$ begin
+  create type project_member_role as enum ('lead','contributor','viewer');
+exception when duplicate_object then null; end $$;
+
+do $$ begin
+  create type org_plan as enum ('free','team','business','enterprise');
+exception when duplicate_object then null; end $$;
+
+do $$ begin
+  create type audit_source as enum ('app','sheets','api','ai','chat_bot','email');
+exception when duplicate_object then null; end $$;
+
+do $$ begin
+  create type task_status as enum ('todo','in_progress','in_review','done','canceled');
+exception when duplicate_object then null; end $$;
 
 -- ───────────────────────────────────────────────
--- ORGANIZATIONS (Tenants)
+-- ORGANIZATIONS
 -- ───────────────────────────────────────────────
-create table organizations (
+create table if not exists organizations (
   id            uuid primary key default uuid_generate_v4(),
   name          text not null,
   slug          text not null unique,
@@ -41,7 +63,7 @@ create table organizations (
 -- ───────────────────────────────────────────────
 -- WORKSPACES
 -- ───────────────────────────────────────────────
-create table workspaces (
+create table if not exists workspaces (
   id                   uuid primary key default uuid_generate_v4(),
   org_id               uuid not null references organizations(id) on delete cascade,
   name                 text not null,
@@ -53,7 +75,7 @@ create table workspaces (
 -- ───────────────────────────────────────────────
 -- USERS
 -- ───────────────────────────────────────────────
-create table users (
+create table if not exists users (
   id            uuid primary key default uuid_generate_v4(),
   org_id        uuid not null references organizations(id) on delete cascade,
   name          text not null,
@@ -70,7 +92,7 @@ create table users (
 -- ───────────────────────────────────────────────
 -- DEPARTMENTS
 -- ───────────────────────────────────────────────
-create table departments (
+create table if not exists departments (
   id           uuid primary key default uuid_generate_v4(),
   org_id       uuid not null references organizations(id) on delete cascade,
   name         text not null,
@@ -78,13 +100,15 @@ create table departments (
   head_user_id uuid references users(id) on delete set null
 );
 
-alter table users add constraint fk_users_department
-  foreign key (department_id) references departments(id) on delete set null;
+do $$ begin
+  alter table users add constraint fk_users_department
+    foreign key (department_id) references departments(id) on delete set null;
+exception when duplicate_object then null; end $$;
 
 -- ───────────────────────────────────────────────
 -- PROJECTS
 -- ───────────────────────────────────────────────
-create table projects (
+create table if not exists projects (
   id                        uuid primary key default uuid_generate_v4(),
   workspace_id              uuid not null references workspaces(id) on delete cascade,
   code                      text not null,
@@ -115,7 +139,7 @@ create table projects (
 -- ───────────────────────────────────────────────
 -- PROJECT MEMBERS
 -- ───────────────────────────────────────────────
-create table project_members (
+create table if not exists project_members (
   id          uuid primary key default uuid_generate_v4(),
   project_id  uuid not null references projects(id) on delete cascade,
   user_id     uuid not null references users(id) on delete cascade,
@@ -129,7 +153,7 @@ create table project_members (
 -- ───────────────────────────────────────────────
 -- TASKS
 -- ───────────────────────────────────────────────
-create table tasks (
+create table if not exists tasks (
   id              uuid primary key default uuid_generate_v4(),
   project_id      uuid not null references projects(id) on delete cascade,
   title           text not null,
@@ -150,9 +174,9 @@ create table tasks (
 );
 
 -- ───────────────────────────────────────────────
--- AUDIT LOG (inmutable — sin RLS de escritura para users)
+-- AUDIT LOG
 -- ───────────────────────────────────────────────
-create table audit_log (
+create table if not exists audit_log (
   id            uuid primary key default uuid_generate_v4(),
   org_id        uuid not null references organizations(id) on delete cascade,
   entity_type   text not null,
@@ -170,7 +194,7 @@ create table audit_log (
 -- ───────────────────────────────────────────────
 -- ALERT RULES
 -- ───────────────────────────────────────────────
-create table alert_rules (
+create table if not exists alert_rules (
   id           uuid primary key default uuid_generate_v4(),
   workspace_id uuid not null references workspaces(id) on delete cascade,
   name         text not null,
@@ -187,7 +211,7 @@ create table alert_rules (
 -- ───────────────────────────────────────────────
 -- AI NOTEBOOKS
 -- ───────────────────────────────────────────────
-create table ai_notebooks (
+create table if not exists ai_notebooks (
   id                uuid primary key default uuid_generate_v4(),
   project_id        uuid references projects(id) on delete cascade,
   workspace_id      uuid not null references workspaces(id) on delete cascade,
@@ -201,17 +225,17 @@ create table ai_notebooks (
 -- ───────────────────────────────────────────────
 -- ÍNDICES
 -- ───────────────────────────────────────────────
-create index on projects(workspace_id);
-create index on projects(status);
-create index on projects(kanban_stage);
-create index on projects(end_date);
-create index on tasks(project_id);
-create index on tasks(assignee_id);
-create index on tasks(status);
-create index on project_members(project_id);
-create index on project_members(user_id);
-create index on audit_log(entity_id);
-create index on audit_log(org_id, changed_at desc);
+create index if not exists idx_projects_workspace  on projects(workspace_id);
+create index if not exists idx_projects_status     on projects(status);
+create index if not exists idx_projects_kanban     on projects(kanban_stage);
+create index if not exists idx_projects_end_date   on projects(end_date);
+create index if not exists idx_tasks_project       on tasks(project_id);
+create index if not exists idx_tasks_assignee      on tasks(assignee_id);
+create index if not exists idx_tasks_status        on tasks(status);
+create index if not exists idx_pm_project          on project_members(project_id);
+create index if not exists idx_pm_user             on project_members(user_id);
+create index if not exists idx_audit_entity        on audit_log(entity_id);
+create index if not exists idx_audit_org_date      on audit_log(org_id, changed_at desc);
 
 -- ───────────────────────────────────────────────
 -- TRIGGERS: updated_at automático
@@ -220,34 +244,50 @@ create or replace function set_updated_at()
 returns trigger language plpgsql as $$
 begin new.updated_at = now(); return new; end; $$;
 
+drop trigger if exists trg_projects_updated_at on projects;
 create trigger trg_projects_updated_at before update on projects
   for each row execute function set_updated_at();
+
+drop trigger if exists trg_tasks_updated_at on tasks;
 create trigger trg_tasks_updated_at before update on tasks
   for each row execute function set_updated_at();
+
+drop trigger if exists trg_orgs_updated_at on organizations;
 create trigger trg_orgs_updated_at before update on organizations
   for each row execute function set_updated_at();
 
 -- ───────────────────────────────────────────────
 -- ROW LEVEL SECURITY
 -- ───────────────────────────────────────────────
-alter table organizations  enable row level security;
-alter table workspaces     enable row level security;
-alter table users          enable row level security;
-alter table departments    enable row level security;
-alter table projects       enable row level security;
+alter table organizations   enable row level security;
+alter table workspaces      enable row level security;
+alter table users           enable row level security;
+alter table departments     enable row level security;
+alter table projects        enable row level security;
 alter table project_members enable row level security;
-alter table tasks          enable row level security;
-alter table audit_log      enable row level security;
-alter table alert_rules    enable row level security;
-alter table ai_notebooks   enable row level security;
+alter table tasks           enable row level security;
+alter table audit_log       enable row level security;
+alter table alert_rules     enable row level security;
+alter table ai_notebooks    enable row level security;
 
 -- Función helper: org_id del usuario autenticado
 create or replace function auth_user_org_id()
-returns uuid language sql stable as $$
+returns uuid language sql stable security definer as $$
   select org_id from users where email = auth.jwt() ->> 'email' limit 1;
 $$;
 
--- Políticas base (misma org = acceso)
+-- Políticas (drop first para idempotencia)
+drop policy if exists "org_isolation_orgs"            on organizations;
+drop policy if exists "org_isolation_workspaces"      on workspaces;
+drop policy if exists "org_isolation_users"           on users;
+drop policy if exists "org_isolation_departments"     on departments;
+drop policy if exists "org_isolation_projects"        on projects;
+drop policy if exists "org_isolation_project_members" on project_members;
+drop policy if exists "org_isolation_tasks"           on tasks;
+drop policy if exists "org_isolation_audit_log"       on audit_log;
+drop policy if exists "org_isolation_alert_rules"     on alert_rules;
+drop policy if exists "org_isolation_ai_notebooks"    on ai_notebooks;
+
 create policy "org_isolation_orgs" on organizations
   using (id = auth_user_org_id());
 
