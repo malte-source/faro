@@ -15,7 +15,12 @@ const TASK_STATUS_LABEL: Record<TaskStatus, string> = {
   canceled: 'Cancelado',
 }
 
-export function SearchModal() {
+interface SearchModalProps {
+  /** Renders only the icon button (no text/kbd hint) — for mobile header */
+  compact?: boolean
+}
+
+export function SearchModal({ compact }: SearchModalProps = {}) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
@@ -70,17 +75,29 @@ export function SearchModal() {
 
   return (
     <>
-      {/* Trigger button — rendered in sidebar */}
-      <button
-        onClick={() => setOpen(true)}
-        className="mx-2 mb-1 flex items-center gap-2.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-left text-sm text-slate-400 transition-all hover:border-slate-300 hover:bg-white hover:text-slate-500"
-      >
-        <Search className="h-3.5 w-3.5 shrink-0" />
-        <span className="flex-1">Buscar...</span>
-        <kbd className="rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-slate-400 shadow-sm">
-          ⌘K
-        </kbd>
-      </button>
+      {/* Trigger button */}
+      {compact ? (
+        // Icon-only button for mobile header
+        <button
+          onClick={() => setOpen(true)}
+          className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+          title="Buscar (⌘K)"
+        >
+          <Search className="h-4 w-4" />
+        </button>
+      ) : (
+        // Full trigger for sidebar
+        <button
+          onClick={() => setOpen(true)}
+          className="mx-2 mb-1 flex items-center gap-2.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-left text-sm text-slate-400 transition-all hover:border-slate-300 hover:bg-white hover:text-slate-500"
+        >
+          <Search className="h-3.5 w-3.5 shrink-0" />
+          <span className="flex-1">Buscar...</span>
+          <kbd className="rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-slate-400 shadow-sm">
+            ⌘K
+          </kbd>
+        </button>
+      )}
 
       {/* Modal overlay */}
       {open && (
