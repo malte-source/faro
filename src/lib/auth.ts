@@ -57,9 +57,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           if (org) {
             await supabase.from('users').insert({
               email: user.email,
-              name: user.name,
-              avatar_url: user.image,
-              google_id: account?.providerAccountId,
+              name: user.name ?? user.email.split('@')[0],
+              avatar_url: user.image ?? null,
+              google_id: account?.providerAccountId ?? null,
               org_id: org.id,
               role: 'owner',
             })

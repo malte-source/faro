@@ -5,8 +5,8 @@ export const projectsRouter = createTRPCRouter({
   list: protectedProcedure
     .input(z.object({
       workspaceId: z.string().optional(),
-      status: z.string().optional(),
-      kanbanStage: z.string().optional(),
+      status: z.enum(['not_started', 'in_progress', 'on_hold', 'delayed', 'completed', 'canceled', 'pending']).optional(),
+      kanbanStage: z.enum(['ideas', 'backlog', 'pending', 'in_progress', 'on_hold', 'completed', 'canceled']).optional(),
       departmentId: z.string().optional(),
     }).optional())
     .query(async ({ ctx, input }) => {
@@ -72,25 +72,31 @@ export const projectsRouter = createTRPCRouter({
       color: z.string().default('#6366f1'),
     }))
     .mutation(async ({ ctx, input }) => {
+      const { data: me } = await ctx.supabase
+        .from('users')
+        .select('id')
+        .eq('email', ctx.session.user.email!)
+        .single()
+
       const { data, error } = await ctx.supabase
         .from('projects')
         .insert({
           workspace_id: input.workspaceId,
           code: input.code,
           name: input.name,
-          description: input.description,
+          description: input.description ?? null,
           status: input.status,
           kanban_stage: input.kanbanStage,
           priority: input.priority,
-          start_date: input.startDate,
-          end_date: input.endDate,
-          estimated_hours: input.estimatedHours,
-          budget: input.budget,
-          department_id: input.departmentId,
+          start_date: input.startDate ?? null,
+          end_date: input.endDate ?? null,
+          estimated_hours: input.estimatedHours ?? null,
+          budget: input.budget ?? null,
+          department_id: input.departmentId ?? null,
           color: input.color,
           progress_pct: 0,
           currency: 'USD',
-          created_by: ctx.session.user.id!,
+          created_by: me?.id ?? ctx.session.user.email!,
         })
         .select()
         .single()
@@ -136,7 +142,7 @@ export const projectsRouter = createTRPCRouter({
   dashboard: protectedProcedure.query(async ({ ctx }) => {
     const { data: projects } = await ctx.supabase
       .from('projects')
-      .select('id, status, kanban_stage, priority, end_date, health_score, progress_pct, department_id')
+      .select('id, code, name, status, kanban_stage, priority, end_date, health_score, progress_pct, department_id')
 
     if (!projects) return { total: 0, active: 0, delayed: 0, completed: 0, onHold: 0, dueSoon: [] }
 

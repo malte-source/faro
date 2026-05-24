@@ -33,6 +33,12 @@ export const tasksRouter = createTRPCRouter({
       labels: z.array(z.string()).default([]),
     }))
     .mutation(async ({ ctx, input }) => {
+      const { data: me } = await ctx.supabase
+        .from('users')
+        .select('id')
+        .eq('email', ctx.session.user.email!)
+        .single()
+
       const { data: lastTask } = await ctx.supabase
         .from('tasks')
         .select('position')
@@ -46,9 +52,9 @@ export const tasksRouter = createTRPCRouter({
         .insert({
           project_id: input.projectId,
           title: input.title,
-          description: input.description,
-          assignee_id: input.assigneeId,
-          reporter_id: ctx.session.user.id!,
+          description: input.description ?? null,
+          assignee_id: input.assigneeId ?? null,
+          reporter_id: me?.id ?? ctx.session.user.email!,
           priority: input.priority,
           status: 'todo',
           due_date: input.dueDate,
