@@ -5,10 +5,10 @@ on:
     branches: [main]
 
 env:
-  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  PROJECT_ID: faro-497316
   REGION: southamerica-east1
   SERVICE: faro-app
-  IMAGE: gcr.io/${{ secrets.GCP_PROJECT_ID }}/faro-app
+  IMAGE: gcr.io/faro-497316/faro-app
 
 jobs:
   deploy:
