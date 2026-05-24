@@ -10,6 +10,7 @@ import {
   Settings,
   LogOut,
   Anchor,
+  Kanban,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { logout } from '@/app/actions/auth'
@@ -17,6 +18,7 @@ import { logout } from '@/app/actions/auth'
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/dashboard/projects', label: 'Proyectos', icon: FolderKanban },
+  { href: '/dashboard/kanban', label: 'Kanban', icon: Kanban },
   { href: '/dashboard/tasks', label: 'Tareas', icon: CheckSquare },
   { href: '/dashboard/team', label: 'Equipo', icon: Users },
 ]

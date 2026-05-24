@@ -2,6 +2,50 @@ import { z } from 'zod'
 import { createTRPCRouter, protectedProcedure } from '@/lib/trpc/server'
 
 export const tasksRouter = createTRPCRouter({
+  list: protectedProcedure
+    .input(z.object({
+      status: z.enum(['todo', 'in_progress', 'in_review', 'done', 'canceled']).optional(),
+      priority: z.enum(['very_high', 'high', 'medium', 'low', 'very_low']).optional(),
+      projectId: z.string().optional(),
+      assigneeId: z.string().optional(),
+      onlyMine: z.boolean().optional(),
+    }).optional())
+    .query(async ({ ctx, input }) => {
+      const { data: me } = await ctx.supabase
+        .from('users').select('id, org_id').eq('email', ctx.session.user.email!).single()
+      if (!me) return []
+
+      const { data: workspaces } = await ctx.supabase
+        .from('workspaces').select('id').eq('org_id', me.org_id)
+      const wsIds = workspaces?.map(w => w.id) ?? []
+
+      let projectQuery = ctx.supabase.from('projects').select('id').in('workspace_id', wsIds)
+      if (input?.projectId) projectQuery = projectQuery.eq('id', input.projectId)
+      const { data: projects } = await projectQuery
+      const projectIds = projects?.map(p => p.id) ?? []
+      if (!projectIds.length) return []
+
+      let query = ctx.supabase
+        .from('tasks')
+        .select(`
+          *,
+          assignee:users!tasks_assignee_id_fkey(id, name, avatar_url),
+          project:projects(id, code, name, color)
+        `)
+        .in('project_id', projectIds)
+        .is('parent_task_id', null)
+        .order('created_at', { ascending: false })
+
+      if (input?.status) query = query.eq('status', input.status)
+      if (input?.priority) query = query.eq('priority', input.priority)
+      if (input?.assigneeId) query = query.eq('assignee_id', input.assigneeId)
+      if (input?.onlyMine) query = query.eq('assignee_id', me.id)
+
+      const { data, error } = await query
+      if (error) throw error
+      return data
+    }),
+
   byProject: protectedProcedure
     .input(z.string())
     .query(async ({ ctx, input }) => {
@@ -31,6 +75,7 @@ export const tasksRouter = createTRPCRouter({
       estimatedHours: z.number().optional(),
       parentTaskId: z.string().optional(),
       labels: z.array(z.string()).default([]),
+      status: z.enum(['todo', 'in_progress', 'in_review', 'done', 'canceled']).default('todo'),
     }))
     .mutation(async ({ ctx, input }) => {
       const { data: me } = await ctx.supabase
@@ -56,7 +101,7 @@ export const tasksRouter = createTRPCRouter({
           assignee_id: input.assigneeId ?? null,
           reporter_id: me?.id ?? ctx.session.user.email!,
           priority: input.priority,
-          status: 'todo',
+          status: input.status,
           due_date: input.dueDate,
           estimated_hours: input.estimatedHours,
           parent_task_id: input.parentTaskId,
@@ -68,6 +113,14 @@ export const tasksRouter = createTRPCRouter({
 
       if (error) throw error
       return data
+    }),
+
+  delete: protectedProcedure
+    .input(z.string())
+    .mutation(async ({ ctx, input }) => {
+      const { error } = await ctx.supabase.from('tasks').delete().eq('id', input)
+      if (error) throw error
+      return { success: true }
     }),
 
   update: protectedProcedure

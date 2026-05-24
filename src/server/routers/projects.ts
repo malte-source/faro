@@ -1,12 +1,44 @@
 import { z } from 'zod'
 import { createTRPCRouter, protectedProcedure } from '@/lib/trpc/server'
+import type { SupabaseClient } from '@supabase/supabase-js'
+import type { Database } from '@/types/database'
+
+async function logAudit(
+  supabase: SupabaseClient<Database>,
+  opts: {
+    orgId: string
+    entityType: string
+    entityId: string
+    action: string
+    fieldChanged?: string
+    oldValue?: string | null
+    newValue?: string | null
+    changedBy?: string
+  }
+) {
+  await supabase.from('audit_log').insert({
+    org_id: opts.orgId,
+    entity_type: opts.entityType,
+    entity_id: opts.entityId,
+    action: opts.action,
+    field_changed: opts.fieldChanged ?? null,
+    old_value: opts.oldValue ?? null,
+    new_value: opts.newValue ?? null,
+    changed_by: opts.changedBy ?? null,
+    source: 'app',
+  })
+}
+
+const STATUS_ENUM = ['not_started', 'in_progress', 'on_hold', 'delayed', 'completed', 'canceled', 'pending'] as const
+const KANBAN_ENUM = ['ideas', 'backlog', 'pending', 'in_progress', 'on_hold', 'completed', 'canceled'] as const
+const PRIORITY_ENUM = ['very_high', 'high', 'medium', 'low', 'very_low'] as const
 
 export const projectsRouter = createTRPCRouter({
   list: protectedProcedure
     .input(z.object({
       workspaceId: z.string().optional(),
-      status: z.enum(['not_started', 'in_progress', 'on_hold', 'delayed', 'completed', 'canceled', 'pending']).optional(),
-      kanbanStage: z.enum(['ideas', 'backlog', 'pending', 'in_progress', 'on_hold', 'completed', 'canceled']).optional(),
+      status: z.enum(STATUS_ENUM).optional(),
+      kanbanStage: z.enum(KANBAN_ENUM).optional(),
       departmentId: z.string().optional(),
     }).optional())
     .query(async ({ ctx, input }) => {
@@ -41,11 +73,7 @@ export const projectsRouter = createTRPCRouter({
           department:departments(id, name, color),
           members:project_members(
             id, role, joined_at,
-            user:users(id, name, email, avatar_url, department_id)
-          ),
-          tasks(
-            id, title, status, priority, due_date,
-            assignee:users!tasks_assignee_id_fkey(id, name, avatar_url)
+            user:users(id, name, email, avatar_url, position)
           )
         `)
         .eq('id', input)
@@ -57,31 +85,37 @@ export const projectsRouter = createTRPCRouter({
 
   create: protectedProcedure
     .input(z.object({
-      workspaceId: z.string(),
+      workspaceId: z.string().optional(),
       code: z.string(),
       name: z.string().min(1),
       description: z.string().optional(),
-      status: z.enum(['not_started', 'in_progress', 'on_hold', 'delayed', 'completed', 'canceled', 'pending']).default('not_started'),
-      kanbanStage: z.enum(['ideas', 'backlog', 'pending', 'in_progress', 'on_hold', 'completed', 'canceled']).default('backlog'),
-      priority: z.enum(['very_high', 'high', 'medium', 'low', 'very_low']).default('medium'),
+      status: z.enum(STATUS_ENUM).default('not_started'),
+      kanbanStage: z.enum(KANBAN_ENUM).default('backlog'),
+      priority: z.enum(PRIORITY_ENUM).default('medium'),
       startDate: z.string().optional(),
       endDate: z.string().optional(),
       estimatedHours: z.number().optional(),
       budget: z.number().optional(),
+      currency: z.string().default('USD'),
       departmentId: z.string().optional(),
       color: z.string().default('#6366f1'),
     }))
     .mutation(async ({ ctx, input }) => {
       const { data: me } = await ctx.supabase
-        .from('users')
-        .select('id')
-        .eq('email', ctx.session.user.email!)
-        .single()
+        .from('users').select('id, org_id').eq('email', ctx.session.user.email!).single()
+
+      let workspaceId = input.workspaceId
+      if (!workspaceId) {
+        const { data: ws } = await ctx.supabase
+          .from('workspaces').select('id').eq('org_id', me?.org_id ?? '').limit(1).single()
+        workspaceId = ws?.id
+      }
+      if (!workspaceId) throw new Error('No workspace found')
 
       const { data, error } = await ctx.supabase
         .from('projects')
         .insert({
-          workspace_id: input.workspaceId,
+          workspace_id: workspaceId,
           code: input.code,
           name: input.name,
           description: input.description ?? null,
@@ -92,16 +126,28 @@ export const projectsRouter = createTRPCRouter({
           end_date: input.endDate ?? null,
           estimated_hours: input.estimatedHours ?? null,
           budget: input.budget ?? null,
+          currency: input.currency,
           department_id: input.departmentId ?? null,
           color: input.color,
           progress_pct: 0,
-          currency: 'USD',
           created_by: me?.id ?? ctx.session.user.email!,
         })
         .select()
         .single()
 
       if (error) throw error
+
+      if (me && data) {
+        await logAudit(ctx.supabase, {
+          orgId: me.org_id,
+          entityType: 'project',
+          entityId: data.id,
+          action: 'created',
+          newValue: data.name,
+          changedBy: me.id,
+        })
+      }
+
       return data
     }),
 
@@ -110,15 +156,22 @@ export const projectsRouter = createTRPCRouter({
       id: z.string(),
       name: z.string().min(1).optional(),
       description: z.string().optional(),
-      status: z.enum(['not_started', 'in_progress', 'on_hold', 'delayed', 'completed', 'canceled', 'pending']).optional(),
-      kanbanStage: z.enum(['ideas', 'backlog', 'pending', 'in_progress', 'on_hold', 'completed', 'canceled']).optional(),
-      priority: z.enum(['very_high', 'high', 'medium', 'low', 'very_low']).optional(),
-      startDate: z.string().optional(),
-      endDate: z.string().optional(),
+      status: z.enum(STATUS_ENUM).optional(),
+      kanbanStage: z.enum(KANBAN_ENUM).optional(),
+      priority: z.enum(PRIORITY_ENUM).optional(),
+      startDate: z.string().optional().nullable(),
+      endDate: z.string().optional().nullable(),
       progressPct: z.number().min(0).max(100).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const { id, ...rest } = input
+
+      const { data: me } = await ctx.supabase
+        .from('users').select('id, org_id').eq('email', ctx.session.user.email!).single()
+
+      const { data: prev } = await ctx.supabase
+        .from('projects').select('status, kanban_stage, progress_pct, name').eq('id', id).single()
+
       const { data, error } = await ctx.supabase
         .from('projects')
         .update({
@@ -127,8 +180,8 @@ export const projectsRouter = createTRPCRouter({
           ...(rest.status && { status: rest.status }),
           ...(rest.kanbanStage && { kanban_stage: rest.kanbanStage }),
           ...(rest.priority && { priority: rest.priority }),
-          ...(rest.startDate && { start_date: rest.startDate }),
-          ...(rest.endDate && { end_date: rest.endDate }),
+          ...(rest.startDate !== undefined && { start_date: rest.startDate }),
+          ...(rest.endDate !== undefined && { end_date: rest.endDate }),
           ...(rest.progressPct !== undefined && { progress_pct: rest.progressPct }),
         })
         .eq('id', id)
@@ -136,18 +189,144 @@ export const projectsRouter = createTRPCRouter({
         .single()
 
       if (error) throw error
+
+      if (me && prev && data) {
+        const changes: { field: string; old: string; new: string }[] = []
+        if (rest.status && rest.status !== prev.status) changes.push({ field: 'status', old: prev.status, new: rest.status })
+        if (rest.kanbanStage && rest.kanbanStage !== prev.kanban_stage) changes.push({ field: 'kanban_stage', old: prev.kanban_stage, new: rest.kanbanStage })
+        if (rest.progressPct !== undefined && rest.progressPct !== prev.progress_pct) changes.push({ field: 'progress_pct', old: String(prev.progress_pct), new: String(rest.progressPct) })
+
+        for (const change of changes) {
+          await logAudit(ctx.supabase, {
+            orgId: me.org_id,
+            entityType: 'project',
+            entityId: id,
+            action: 'updated',
+            fieldChanged: change.field,
+            oldValue: change.old,
+            newValue: change.new,
+            changedBy: me.id,
+          })
+        }
+      }
+
       return data
+    }),
+
+  delete: protectedProcedure
+    .input(z.string())
+    .mutation(async ({ ctx, input }) => {
+      const { data: me } = await ctx.supabase
+        .from('users').select('id, org_id').eq('email', ctx.session.user.email!).single()
+      const { data: proj } = await ctx.supabase
+        .from('projects').select('name').eq('id', input).single()
+
+      const { error } = await ctx.supabase.from('projects').delete().eq('id', input)
+      if (error) throw error
+
+      if (me && proj) {
+        await logAudit(ctx.supabase, {
+          orgId: me.org_id,
+          entityType: 'project',
+          entityId: input,
+          action: 'deleted',
+          oldValue: proj.name,
+          changedBy: me.id,
+        })
+      }
+
+      return { success: true }
+    }),
+
+  computeHealth: protectedProcedure
+    .input(z.string())
+    .mutation(async ({ ctx, input: projectId }) => {
+      const [{ data: project }, { data: tasks }] = await Promise.all([
+        ctx.supabase.from('projects').select('status, end_date, progress_pct').eq('id', projectId).single(),
+        ctx.supabase.from('tasks').select('status').eq('project_id', projectId),
+      ])
+
+      if (!project) throw new Error('Project not found')
+
+      let score = 50
+
+      if (project.status === 'completed') {
+        score = 95
+      } else if (project.status === 'canceled') {
+        score = 20
+      } else {
+        const total = tasks?.length ?? 0
+        const done = tasks?.filter(t => t.status === 'done').length ?? 0
+        const taskScore = total > 0 ? (done / total) * 40 : 20
+
+        const now = new Date()
+        let dateScore = 20
+        if (project.end_date) {
+          const end = new Date(project.end_date)
+          const daysLeft = Math.ceil((end.getTime() - now.getTime()) / 86400000)
+          if (daysLeft < 0) dateScore = 0          // overdue
+          else if (daysLeft <= 3) dateScore = 8    // critical
+          else if (daysLeft <= 7) dateScore = 14   // warning
+          else dateScore = 20                       // on track
+        }
+
+        let statusScore = 10
+        if (project.status === 'delayed') statusScore = 0
+        else if (project.status === 'on_hold') statusScore = 5
+        else if (project.status === 'in_progress') statusScore = 10
+
+        const progressScore = project.progress_pct >= 50 ? 20 : (project.progress_pct / 50) * 20
+
+        score = Math.round(Math.min(100, Math.max(0, taskScore + dateScore + statusScore + progressScore)))
+      }
+
+      const { data, error } = await ctx.supabase
+        .from('projects')
+        .update({ health_score: score, health_updated_at: new Date().toISOString() })
+        .eq('id', projectId)
+        .select('id, health_score, health_updated_at')
+        .single()
+
+      if (error) throw error
+      return data
+    }),
+
+  addMember: protectedProcedure
+    .input(z.object({
+      projectId: z.string(),
+      userId: z.string(),
+      role: z.enum(['lead', 'contributor', 'viewer']).default('contributor'),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const { data: me } = await ctx.supabase
+        .from('users').select('id').eq('email', ctx.session.user.email!).single()
+
+      const { data, error } = await ctx.supabase
+        .from('project_members')
+        .insert({ project_id: input.projectId, user_id: input.userId, role: input.role, added_by: me?.id ?? input.userId })
+        .select(`id, role, joined_at, user:users(id, name, email, avatar_url, position)`)
+        .single()
+
+      if (error) throw error
+      return data
+    }),
+
+  removeMember: protectedProcedure
+    .input(z.object({ memberId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const { error } = await ctx.supabase.from('project_members').delete().eq('id', input.memberId)
+      if (error) throw error
+      return { success: true }
     }),
 
   dashboard: protectedProcedure.query(async ({ ctx }) => {
     const { data: projects } = await ctx.supabase
       .from('projects')
-      .select('id, code, name, status, kanban_stage, priority, end_date, health_score, progress_pct, department_id')
+      .select('id, code, name, status, kanban_stage, priority, end_date, health_score, progress_pct, color')
 
-    if (!projects) return { total: 0, active: 0, delayed: 0, completed: 0, onHold: 0, dueSoon: [] }
+    if (!projects) return { total: 0, active: 0, delayed: 0, completed: 0, onHold: 0, dueSoon: [], byStatus: {} }
 
-    const now = new Date()
-    const weekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
+    const weekFromNow = new Date(Date.now() + 7 * 86400000)
 
     return {
       total: projects.length,

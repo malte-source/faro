@@ -128,6 +128,13 @@ export interface Database {
             isOneToOne: false
             referencedRelation: 'organizations'
             referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'fk_users_department'
+            columns: ['department_id']
+            isOneToOne: false
+            referencedRelation: 'departments'
+            referencedColumns: ['id']
           }
         ]
       }
@@ -159,6 +166,13 @@ export interface Database {
             columns: ['org_id']
             isOneToOne: false
             referencedRelation: 'organizations'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'departments_head_user_id_fkey'
+            columns: ['head_user_id']
+            isOneToOne: false
+            referencedRelation: 'users'
             referencedColumns: ['id']
           }
         ]
@@ -408,7 +422,15 @@ export interface Database {
           ip_address?: string | null
         }
         Update: never
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: 'audit_log_changed_by_fkey'
+            columns: ['changed_by']
+            isOneToOne: false
+            referencedRelation: 'users'
+            referencedColumns: ['id']
+          }
+        ]
       }
     }
     Views: {

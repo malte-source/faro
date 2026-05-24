@@ -81,6 +81,40 @@ export const teamRouter = createTRPCRouter({
     return data
   }),
 
+  updateMember: protectedProcedure
+    .input(z.object({
+      userId: z.string(),
+      name: z.string().min(1).optional(),
+      role: z.enum(['admin', 'manager', 'member', 'viewer']).optional(),
+      departmentId: z.string().nullable().optional(),
+      position: z.string().nullable().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const { userId, ...fields } = input
+      const { data, error } = await ctx.supabase
+        .from('users')
+        .update({
+          ...(fields.name && { name: fields.name }),
+          ...(fields.role && { role: fields.role }),
+          ...(fields.departmentId !== undefined && { department_id: fields.departmentId }),
+          ...(fields.position !== undefined && { position: fields.position }),
+        })
+        .eq('id', userId)
+        .select()
+        .single()
+      if (error) throw error
+      return data
+    }),
+
+  deactivateMember: protectedProcedure
+    .input(z.object({ userId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const { error } = await ctx.supabase
+        .from('users').update({ is_active: false }).eq('id', input.userId)
+      if (error) throw error
+      return { success: true }
+    }),
+
   workload: protectedProcedure.query(async ({ ctx }) => {
     const { data: me } = await ctx.supabase
       .from('users')
