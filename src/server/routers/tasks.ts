@@ -116,6 +116,43 @@ export const tasksRouter = createTRPCRouter({
       return { success: true }
     }),
 
+  stats: protectedProcedure.query(async ({ ctx }) => {
+    const { me, workspaceIds } = ctx
+    if (!workspaceIds.length) {
+      return { byStatus: { todo: 0, in_progress: 0, in_review: 0, done: 0, canceled: 0 }, total: 0, myPending: 0, overdue: 0 }
+    }
+
+    const { data: projects } = await ctx.supabase
+      .from('projects').select('id').in('workspace_id', workspaceIds)
+    const projectIds = projects?.map(p => p.id) ?? []
+
+    if (!projectIds.length) {
+      return { byStatus: { todo: 0, in_progress: 0, in_review: 0, done: 0, canceled: 0 }, total: 0, myPending: 0, overdue: 0 }
+    }
+
+    const today = new Date().toISOString().split('T')[0]
+
+    const [{ data: tasks }, { data: myPendingTasks }] = await Promise.all([
+      ctx.supabase.from('tasks').select('id, status, due_date').in('project_id', projectIds).is('parent_task_id', null),
+      ctx.supabase.from('tasks').select('id').in('project_id', projectIds)
+        .eq('assignee_id', me.id).neq('status', 'done').neq('status', 'canceled').is('parent_task_id', null),
+    ])
+
+    const byStatus = {
+      todo:        tasks?.filter(t => t.status === 'todo').length ?? 0,
+      in_progress: tasks?.filter(t => t.status === 'in_progress').length ?? 0,
+      in_review:   tasks?.filter(t => t.status === 'in_review').length ?? 0,
+      done:        tasks?.filter(t => t.status === 'done').length ?? 0,
+      canceled:    tasks?.filter(t => t.status === 'canceled').length ?? 0,
+    }
+
+    const overdue = tasks?.filter(t =>
+      t.due_date && t.due_date < today && t.status !== 'done' && t.status !== 'canceled'
+    ).length ?? 0
+
+    return { byStatus, total: tasks?.length ?? 0, myPending: myPendingTasks?.length ?? 0, overdue }
+  }),
+
   update: protectedProcedure
     .input(z.object({
       id: z.string(),

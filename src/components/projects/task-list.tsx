@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { AddTaskDialog } from './add-task-dialog'
 import { EditTaskDialog } from './edit-task-dialog'
+import { TaskDetailPanel } from './task-detail-panel'
 import { PRIORITY, formatDate, daysUntil } from '@/lib/utils'
 import { Plus, Trash2, Calendar, AlertCircle, Pencil } from 'lucide-react'
 import type { TaskStatus } from '@/types/database'
@@ -26,6 +27,7 @@ export function TaskList({ projectId }: Props) {
   const [addOpen, setAddOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
   const [editTaskId, setEditTaskId] = useState<string | null>(null)
+  const [detailTaskId, setDetailTaskId] = useState<string | null>(null)
   const { data: tasks, isLoading } = trpc.tasks.byProject.useQuery(projectId)
   const utils = trpc.useUtils()
 
@@ -76,7 +78,8 @@ export function TaskList({ projectId }: Props) {
         return (
           <div
             key={task.id}
-            className="group flex items-center gap-3 rounded-lg border border-transparent px-3 py-2.5 hover:border-slate-200 hover:bg-white transition-all"
+            className="group flex items-center gap-3 rounded-lg border border-transparent px-3 py-2.5 hover:border-slate-200 hover:bg-white transition-all cursor-pointer"
+            onClick={() => setDetailTaskId(task.id)}
           >
             <div className={`h-2 w-2 shrink-0 rounded-full ${priorityInfo?.dot ?? 'bg-slate-300'}`} />
 
@@ -117,13 +120,13 @@ export function TaskList({ projectId }: Props) {
             </div>
 
             <button
-              onClick={() => { setEditTaskId(task.id); setEditOpen(true) }}
+              onClick={(e) => { e.stopPropagation(); setEditTaskId(task.id); setEditOpen(true) }}
               className="hidden group-hover:flex h-6 w-6 items-center justify-center rounded text-slate-400 hover:text-indigo-600 transition-colors"
             >
               <Pencil className="h-3.5 w-3.5" />
             </button>
             <button
-              onClick={() => deleteTask.mutate(task.id)}
+              onClick={(e) => { e.stopPropagation(); deleteTask.mutate(task.id) }}
               className="hidden group-hover:flex h-6 w-6 items-center justify-center rounded text-slate-400 hover:text-red-500 transition-colors"
             >
               <Trash2 className="h-3.5 w-3.5" />
@@ -133,6 +136,11 @@ export function TaskList({ projectId }: Props) {
       })}
 
       <AddTaskDialog open={addOpen} onOpenChange={setAddOpen} projectId={projectId} />
+      <TaskDetailPanel
+        taskId={detailTaskId}
+        projectId={projectId}
+        onClose={() => setDetailTaskId(null)}
+      />
       <EditTaskDialog
         open={editOpen}
         onOpenChange={setEditOpen}

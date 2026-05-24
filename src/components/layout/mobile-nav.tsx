@@ -2,14 +2,14 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, FolderKanban, CheckSquare, Users, Kanban } from 'lucide-react'
+import { LayoutDashboard, FolderKanban, CheckSquare, Users, CalendarDays } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const navItems = [
   { href: '/dashboard', label: 'Inicio', icon: LayoutDashboard },
   { href: '/dashboard/projects', label: 'Proyectos', icon: FolderKanban },
-  { href: '/dashboard/kanban', label: 'Kanban', icon: Kanban },
   { href: '/dashboard/tasks', label: 'Tareas', icon: CheckSquare },
+  { href: '/dashboard/calendar', label: 'Calendario', icon: CalendarDays },
   { href: '/dashboard/team', label: 'Equipo', icon: Users },
 ]
 
@@ -28,7 +28,7 @@ export function MobileNav() {
               key={href}
               href={href}
               className={cn(
-                'flex flex-1 flex-col items-center gap-0.5 px-1 py-2.5 text-[10px] font-medium transition-colors',
+                'relative flex flex-1 flex-col items-center gap-0.5 px-1 py-2.5 text-[10px] font-medium transition-colors',
                 active
                   ? 'text-indigo-600'
                   : 'text-slate-500 active:text-slate-700'
@@ -37,7 +37,7 @@ export function MobileNav() {
               <Icon className={cn('h-5 w-5 shrink-0', active && 'drop-shadow-sm')} />
               <span>{label}</span>
               {active && (
-                <span className="absolute top-0 mx-auto h-0.5 w-8 rounded-full bg-indigo-600" />
+                <span className="absolute top-0 left-1/2 -translate-x-1/2 h-0.5 w-8 rounded-full bg-indigo-600" />
               )}
             </Link>
           )

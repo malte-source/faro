@@ -11,6 +11,7 @@ import {
   LogOut,
   Anchor,
   Kanban,
+  CalendarDays,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { logout } from '@/app/actions/auth'
@@ -22,6 +23,7 @@ const navItems = [
   { href: '/dashboard/projects', label: 'Proyectos', icon: FolderKanban },
   { href: '/dashboard/kanban', label: 'Kanban', icon: Kanban },
   { href: '/dashboard/tasks', label: 'Tareas', icon: CheckSquare },
+  { href: '/dashboard/calendar', label: 'Calendario', icon: CalendarDays },
   { href: '/dashboard/team', label: 'Equipo', icon: Users },
 ]
 
