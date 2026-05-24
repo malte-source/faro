@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { createTRPCRouter, protectedProcedure } from '@/lib/trpc/server'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
+import { getFlashModel } from '@/lib/gemini'
 
 async function logAudit(
   supabase: SupabaseClient<Database>,
@@ -346,4 +347,107 @@ export const projectsRouter = createTRPCRouter({
       },
     }
   }),
+
+  aiInsight: protectedProcedure
+    .input(z.string()) // projectId
+    .mutation(async ({ ctx, input: projectId }) => {
+      // Gather project context
+      const [{ data: project }, { data: tasks }, { data: members }] = await Promise.all([
+        ctx.supabase
+          .from('projects')
+          .select('id, code, name, description, status, priority, start_date, end_date, progress_pct, health_score, budget, currency')
+          .eq('id', projectId)
+          .single(),
+        ctx.supabase
+          .from('tasks')
+          .select('id, title, status, priority, due_date, assignee_id')
+          .eq('project_id', projectId)
+          .is('parent_task_id', null),
+        ctx.supabase
+          .from('project_members')
+          .select('id, role')
+          .eq('project_id', projectId)
+          .is('removed_at', null),
+      ])
+
+      if (!project) throw new Error('Project not found')
+
+      const today = new Date()
+      const endDate = project.end_date ? new Date(project.end_date) : null
+      const daysLeft = endDate ? Math.ceil((endDate.getTime() - today.getTime()) / 86400000) : null
+
+      const taskStats = {
+        total: tasks?.length ?? 0,
+        done: tasks?.filter(t => t.status === 'done').length ?? 0,
+        in_progress: tasks?.filter(t => t.status === 'in_progress').length ?? 0,
+        in_review: tasks?.filter(t => t.status === 'in_review').length ?? 0,
+        todo: tasks?.filter(t => t.status === 'todo').length ?? 0,
+        canceled: tasks?.filter(t => t.status === 'canceled').length ?? 0,
+        overdue: tasks?.filter(t => t.due_date && new Date(t.due_date) < today && t.status !== 'done' && t.status !== 'canceled').length ?? 0,
+        dueSoon: tasks?.filter(t => {
+          if (!t.due_date || t.status === 'done' || t.status === 'canceled') return false
+          const d = new Date(t.due_date)
+          const diff = (d.getTime() - today.getTime()) / 86400000
+          return diff >= 0 && diff <= 7
+        }).length ?? 0,
+        unassigned: tasks?.filter(t => !t.assignee_id && t.status !== 'done' && t.status !== 'canceled').length ?? 0,
+      }
+
+      const STATUS_ES: Record<string, string> = {
+        not_started: 'No iniciado', in_progress: 'En progreso', on_hold: 'En pausa',
+        delayed: 'Retrasado', completed: 'Completado', canceled: 'Cancelado', pending: 'Pendiente',
+      }
+      const PRIORITY_ES: Record<string, string> = {
+        very_high: 'Muy alta', high: 'Alta', medium: 'Media', low: 'Baja', very_low: 'Muy baja',
+      }
+
+      const prompt = `Eres un experto en gestión de proyectos. Analiza el siguiente proyecto y proporciona un análisis ejecutivo conciso.
+
+PROYECTO: ${project.name} (${project.code})
+Estado: ${STATUS_ES[project.status] ?? project.status}
+Prioridad: ${PRIORITY_ES[project.priority] ?? project.priority}
+Salud: ${project.health_score != null ? `${project.health_score}%` : 'N/A'}
+Progreso: ${project.progress_pct}%
+${project.start_date ? `Inicio: ${project.start_date}` : ''}
+${project.end_date ? `Vencimiento: ${project.end_date}${daysLeft !== null ? ` (${daysLeft > 0 ? `${daysLeft} días restantes` : `${Math.abs(daysLeft)} días vencido`})` : ''}` : ''}
+${project.budget ? `Presupuesto: ${project.currency} ${project.budget}` : ''}
+${project.description ? `Descripción: ${project.description}` : ''}
+
+TAREAS (${taskStats.total} total):
+- Completadas: ${taskStats.done}
+- En progreso: ${taskStats.in_progress}
+- En revisión: ${taskStats.in_review}
+- Por hacer: ${taskStats.todo}
+- Vencidas: ${taskStats.overdue}
+- Vencen esta semana: ${taskStats.dueSoon}
+- Sin asignar: ${taskStats.unassigned}
+
+EQUIPO: ${members?.length ?? 0} integrantes
+
+Responde ÚNICAMENTE con un JSON válido (sin markdown, sin texto adicional):
+{
+  "summary": "Resumen ejecutivo de 2-3 oraciones",
+  "status_assessment": "Evaluación del estado actual en 1 oración",
+  "risks": ["riesgo 1", "riesgo 2", "riesgo 3"],
+  "recommendations": ["recomendación 1", "recomendación 2", "recomendación 3"],
+  "next_steps": ["acción inmediata 1", "acción inmediata 2"]
+}`
+
+      const model = getFlashModel()
+      const result = await model.generateContent(prompt)
+      const text = result.response.text().trim()
+
+      // Strip markdown code block if present
+      const json = text.startsWith('```') ? text.replace(/^```[a-z]*\n?/i, '').replace(/\n?```$/i, '') : text
+
+      const parsed = JSON.parse(json) as {
+        summary: string
+        status_assessment: string
+        risks: string[]
+        recommendations: string[]
+        next_steps: string[]
+      }
+
+      return parsed
+    }),
 })

@@ -10,6 +10,7 @@ import { TaskBoard } from './task-board'
 import { ProjectInfo } from './project-info'
 import { ProjectMembers } from './project-members'
 import { ProjectActivity } from './project-activity'
+import { ProjectAiInsight } from './project-ai-insight'
 import { PROJECT_STATUS, PRIORITY } from '@/lib/utils'
 import { ArrowLeft, List, LayoutDashboard, Info, Users, Trash2, Activity, Heart, FileDown } from 'lucide-react'
 import type { ProjectStatus, ProjectMemberRole } from '@/types/database'
@@ -246,7 +247,12 @@ export function ProjectDetail({ id }: Props) {
       <div className={`flex-1 overflow-auto px-4 py-5 md:px-6 ${tab === 'board' ? 'overflow-x-auto' : ''}`}>
         {tab === 'list' && <TaskList projectId={id} />}
         {tab === 'board' && <TaskBoard projectId={id} />}
-        {tab === 'info' && <ProjectInfo project={project} />}
+        {tab === 'info' && (
+          <div className="space-y-5">
+            <ProjectAiInsight projectId={id} />
+            <ProjectInfo project={project} />
+          </div>
+        )}
         {tab === 'activity' && <ProjectActivity projectId={id} />}
         {tab === 'members' && (
           <ProjectMembers

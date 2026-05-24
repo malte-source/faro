@@ -14,6 +14,7 @@ import {
   Kanban,
   CalendarDays,
   Plus,
+  BarChart3,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { logout } from '@/app/actions/auth'
@@ -27,6 +28,7 @@ const navItems = [
   { href: '/dashboard/kanban', label: 'Kanban', icon: Kanban },
   { href: '/dashboard/tasks', label: 'Tareas', icon: CheckSquare },
   { href: '/dashboard/calendar', label: 'Calendario', icon: CalendarDays },
+  { href: '/dashboard/reports', label: 'Reportes', icon: BarChart3 },
   { href: '/dashboard/team', label: 'Equipo', icon: Users },
 ]
 
