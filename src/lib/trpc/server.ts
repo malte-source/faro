@@ -4,6 +4,18 @@ import { createAdminSupabaseClient } from '@/lib/supabase'
 import { ZodError } from 'zod'
 
 /**
+ * Short-lived server-side cache for user + workspace IDs.
+ * Eliminates 2 DB round-trips on every tRPC batch when the container is warm.
+ * TTL: 60 s — stale data doesn't matter for org/workspace memberships.
+ */
+type CtxCache = {
+  me: { id: string; org_id: string }
+  workspaceIds: string[]
+  expiresAt: number
+}
+const _ctxCache = new Map<string, CtxCache>()
+
+/**
  * Context is created ONCE per HTTP request (per batch).
  * We pre-fetch the current user + workspace IDs here so routers
  * don't each do their own redundant DB round-trip.
@@ -16,19 +28,29 @@ export const createTRPCContext = async () => {
   let workspaceIds: string[] = []
 
   if (session?.user?.email) {
-    const { data: user } = await supabase
-      .from('users')
-      .select('id, org_id')
-      .eq('email', session.user.email)
-      .single()
+    const email = session.user.email
+    const now = Date.now()
+    const cached = _ctxCache.get(email)
 
-    if (user) {
-      me = user
-      const { data: wss } = await supabase
-        .from('workspaces')
-        .select('id')
-        .eq('org_id', user.org_id)
-      workspaceIds = wss?.map(w => w.id) ?? []
+    if (cached && cached.expiresAt > now) {
+      me = cached.me
+      workspaceIds = cached.workspaceIds
+    } else {
+      const { data: user } = await supabase
+        .from('users')
+        .select('id, org_id')
+        .eq('email', email)
+        .single()
+
+      if (user) {
+        me = user
+        const { data: wss } = await supabase
+          .from('workspaces')
+          .select('id')
+          .eq('org_id', user.org_id)
+        workspaceIds = wss?.map(w => w.id) ?? []
+        _ctxCache.set(email, { me: user, workspaceIds, expiresAt: now + 60_000 })
+      }
     }
   }
 

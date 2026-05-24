@@ -45,9 +45,11 @@ jobs:
             --platform managed \
             --allow-unauthenticated \
             --port 3000 \
-            --memory 512Mi \
-            --cpu 1 \
-            --min-instances 0 \
+            --memory 1Gi \
+            --cpu 2 \
+            --min-instances 1 \
             --max-instances 10 \
+            --cpu-boost \
+            --execution-environment gen2 \
             --set-env-vars="NODE_ENV=production,AUTH_URL=https://faro-app-han7ftrrca-rj.a.run.app,AUTH_TRUST_HOST=true" \
             --set-secrets="NEXT_PUBLIC_SUPABASE_URL=FARO_SUPABASE_URL:latest,NEXT_PUBLIC_SUPABASE_ANON_KEY=FARO_SUPABASE_ANON_KEY:latest,SUPABASE_SERVICE_ROLE_KEY=FARO_SUPABASE_SERVICE_ROLE:latest,AUTH_SECRET=FARO_AUTH_SECRET:latest,AUTH_GOOGLE_ID=FARO_GOOGLE_CLIENT_ID:latest,AUTH_GOOGLE_SECRET=FARO_GOOGLE_CLIENT_SECRET:latest,GOOGLE_GEMINI_API_KEY=FARO_GEMINI_API_KEY:latest"

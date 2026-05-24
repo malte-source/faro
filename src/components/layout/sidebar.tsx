@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
@@ -12,11 +13,13 @@ import {
   Anchor,
   Kanban,
   CalendarDays,
+  Plus,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { logout } from '@/app/actions/auth'
 import { SearchModal } from '@/components/search/search-modal'
 import { NotificationsPanel } from '@/components/notifications/notifications-panel'
+import { QuickCreateModal } from '@/components/tasks/quick-create-modal'
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -35,6 +38,21 @@ interface SidebarProps {
 
 export function Sidebar({ userName, userEmail, userAvatar }: SidebarProps) {
   const pathname = usePathname()
+  const [quickCreate, setQuickCreate] = useState(false)
+
+  // Keyboard shortcut: press 'n' when not focused on an input to open quick create
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement).tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement).isContentEditable) return
+      if (e.key === 'n' && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        e.preventDefault()
+        setQuickCreate(true)
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
 
   const initials = userName
     ?.split(' ')
@@ -56,6 +74,18 @@ export function Sidebar({ userName, userEmail, userAvatar }: SidebarProps) {
       {/* Search */}
       <div className="px-0 py-2 border-b border-slate-100">
         <SearchModal />
+      </div>
+
+      {/* Quick create */}
+      <div className="px-2 pt-2 pb-1">
+        <button
+          onClick={() => setQuickCreate(true)}
+          className="flex w-full items-center gap-2.5 rounded-lg border border-dashed border-slate-300 px-3 py-2 text-xs font-medium text-slate-500 transition-colors hover:border-indigo-400 hover:bg-indigo-50 hover:text-indigo-600"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          <span>Nueva tarea</span>
+          <kbd className="ml-auto rounded border border-slate-200 bg-slate-100 px-1 py-0.5 text-[10px] font-mono text-slate-400">N</kbd>
+        </button>
       </div>
 
       {/* Nav */}
@@ -120,6 +150,7 @@ export function Sidebar({ userName, userEmail, userAvatar }: SidebarProps) {
             <p className="truncate text-xs text-slate-400">{userEmail}</p>
           </div>
           <NotificationsPanel />
+          <QuickCreateModal open={quickCreate} onClose={() => setQuickCreate(false)} />
           <form action={logout}>
             <button
               type="submit"
