@@ -14,6 +14,8 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { logout } from '@/app/actions/auth'
+import { SearchModal } from '@/components/search/search-modal'
+import { NotificationsPanel } from '@/components/notifications/notifications-panel'
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -47,6 +49,11 @@ export function Sidebar({ userName, userEmail, userAvatar }: SidebarProps) {
           <Anchor className="h-4 w-4 text-white" />
         </div>
         <span className="text-base font-bold tracking-tight text-slate-900">Faro</span>
+      </div>
+
+      {/* Search */}
+      <div className="px-0 py-2 border-b border-slate-100">
+        <SearchModal />
       </div>
 
       {/* Nav */}
@@ -110,6 +117,7 @@ export function Sidebar({ userName, userEmail, userAvatar }: SidebarProps) {
             <p className="truncate text-xs font-medium text-slate-900">{userName}</p>
             <p className="truncate text-xs text-slate-400">{userEmail}</p>
           </div>
+          <NotificationsPanel />
           <form action={logout}>
             <button
               type="submit"

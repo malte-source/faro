@@ -12,7 +12,7 @@ import { ProjectInfo } from './project-info'
 import { ProjectMembers } from './project-members'
 import { ProjectActivity } from './project-activity'
 import { PROJECT_STATUS, PRIORITY } from '@/lib/utils'
-import { ArrowLeft, List, LayoutDashboard, Info, Users, Trash2, Activity, Heart } from 'lucide-react'
+import { ArrowLeft, List, LayoutDashboard, Info, Users, Trash2, Activity, Heart, FileDown } from 'lucide-react'
 import type { ProjectStatus, KanbanStage, ProjectMemberRole } from '@/types/database'
 
 type Tab = 'list' | 'board' | 'info' | 'members' | 'activity'
@@ -159,6 +159,15 @@ export function ProjectDetail({ id }: Props) {
             </div>
           </div>
 
+          <a
+            href={`/dashboard/projects/${id}/print`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-slate-400 hover:text-indigo-600 transition-colors p-1"
+            title="Exportar reporte PDF"
+          >
+            <FileDown className="h-4 w-4" />
+          </a>
           <button
             onClick={() => {
               if (confirm(`¿Eliminar el proyecto "${project.name}"? Esta acción no se puede deshacer.`)) {
