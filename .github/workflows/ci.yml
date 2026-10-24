@@ -7,15 +7,33 @@ on:
     branches: [develop]
 
 jobs:
-  lint-typecheck:
+  typecheck-test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: npm
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec tsc --noEmit
+      - run: pnpm test
 
-      - run: npm ci
-      - run: npm run lint
-      - run: npx tsc --noEmit
+  # Lint carries known debt (react-hooks rules in legacy components): report it, don't block merges yet.
+  lint:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run lint

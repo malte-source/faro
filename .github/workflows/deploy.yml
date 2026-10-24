@@ -1,8 +1,14 @@
 name: Deploy to Cloud Run
 
+# MANUAL ONLY. This workflow used to run on every push to main and passed
+# --set-env-vars / --set-secrets, which REPLACE the service's whole configuration
+# (it omitted CRON_SECRET and pointed AUTH_URL at a different host). Releases are
+# made with `gcloud builds submit` + `gcloud run deploy --image` (which keeps the
+# service's existing env and secrets). Re-enable the push trigger only after moving
+# to Workload Identity Federation (no long-lived key) and adding a staging project.
+
 on:
-  push:
-    branches: [main]
+  workflow_dispatch:
 
 env:
   PROJECT_ID: faro-497316
@@ -38,6 +44,7 @@ jobs:
           docker push $IMAGE:latest
 
       - name: Deploy to Cloud Run
+        # No --set-env-vars / --set-secrets on purpose: keep the service's existing configuration.
         run: |
           gcloud run deploy $SERVICE \
             --image $IMAGE:$GITHUB_SHA \
@@ -50,6 +57,4 @@ jobs:
             --min-instances 1 \
             --max-instances 10 \
             --cpu-boost \
-            --execution-environment gen2 \
-            --set-env-vars="NODE_ENV=production,AUTH_URL=https://faro-app-han7ftrrca-rj.a.run.app,AUTH_TRUST_HOST=true" \
-            --set-secrets="NEXT_PUBLIC_SUPABASE_URL=FARO_SUPABASE_URL:latest,NEXT_PUBLIC_SUPABASE_ANON_KEY=FARO_SUPABASE_ANON_KEY:latest,SUPABASE_SERVICE_ROLE_KEY=FARO_SUPABASE_SERVICE_ROLE:latest,AUTH_SECRET=FARO_AUTH_SECRET:latest,AUTH_GOOGLE_ID=FARO_GOOGLE_CLIENT_ID:latest,AUTH_GOOGLE_SECRET=FARO_GOOGLE_CLIENT_SECRET:latest,GOOGLE_GEMINI_API_KEY=FARO_GEMINI_API_KEY:latest"
+            --execution-environment gen2
