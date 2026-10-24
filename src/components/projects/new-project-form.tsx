@@ -7,8 +7,10 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { ArrowLeft } from 'lucide-react'
+import { SelectItem } from '@/components/ui/select'
+import { ResponsiveSelect } from '@/components/projects/mobile-bits'
+import { ArrowLeft, Globe, Lock, User } from 'lucide-react'
+import { toast } from '@/components/ui/toaster'
 
 const COLORS = [
   '#6366f1', '#8b5cf6', '#ec4899', '#ef4444', '#f97316',
@@ -29,6 +31,7 @@ export function NewProjectForm() {
   const [kanbanStage, setKanbanStage] = useState('backlog')
   const [priority, setPriority] = useState('medium')
   const [color, setColor] = useState(COLORS[0])
+  const [visibility, setVisibility] = useState<'workspace' | 'private' | 'personal'>('workspace')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [estimatedHours, setEstimatedHours] = useState('')
@@ -37,9 +40,15 @@ export function NewProjectForm() {
   const [departmentId, setDepartmentId] = useState('none')
 
   const { data: departments } = trpc.team.departments.useQuery()
+  const utils = trpc.useUtils()
 
   const create = trpc.projects.create.useMutation({
-    onSuccess: (project) => router.push(`/dashboard/projects/${project.id}`),
+    onSuccess: (project) => {
+      toast.success('Proyecto creado', `[${project.code}] ${project.name}`)
+      utils.projects.invalidate()
+      router.push(`/dashboard/projects/${project.id}`)
+    },
+    onError: (e) => toast.error('No se pudo crear el proyecto', e.message),
   })
 
   function handleNameChange(v: string) {
@@ -64,6 +73,7 @@ export function NewProjectForm() {
       budget: budget ? Number(budget) : undefined,
       currency,
       departmentId: departmentId !== 'none' ? departmentId : undefined,
+      visibility,
     })
   }
 
@@ -71,7 +81,7 @@ export function NewProjectForm() {
     <div className="mx-auto max-w-2xl">
       <button
         onClick={() => router.back()}
-        className="mb-6 flex items-center gap-2 text-sm text-slate-500 hover:text-slate-800 transition-colors"
+        className="mb-6 hidden items-center gap-2 text-sm text-graphite transition-colors hover:text-foreground md:flex"
       >
         <ArrowLeft className="h-4 w-4" /> Volver
       </button>
@@ -79,11 +89,11 @@ export function NewProjectForm() {
       <form onSubmit={handleSubmit} className="space-y-8">
         {/* Identidad */}
         <section className="space-y-4">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">Identidad</h2>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-graphite">Identidad</h2>
 
           <div className="space-y-1.5">
             <Label htmlFor="name">Nombre del proyecto *</Label>
-            <Input
+            <Input className="h-12 md:h-9"
               id="name"
               placeholder="Ej: Rediseño web corporativa"
               value={name}
@@ -101,27 +111,24 @@ export function NewProjectForm() {
                 value={code}
                 onChange={e => { setCode(e.target.value.toUpperCase()); setCodeManual(true) }}
                 maxLength={8}
-                className="font-mono uppercase"
+                className="h-12 font-mono uppercase md:h-9"
               />
             </div>
 
             <div className="space-y-1.5">
               <Label>Departamento</Label>
-              <Select value={departmentId} onValueChange={setDepartmentId}>
-                <SelectTrigger><SelectValue placeholder="Ninguno" /></SelectTrigger>
-                <SelectContent>
+              <ResponsiveSelect value={departmentId} onValueChange={setDepartmentId}>
                   <SelectItem value="none">Sin departamento</SelectItem>
                   {departments?.map(d => (
                     <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
                   ))}
-                </SelectContent>
-              </Select>
+                </ResponsiveSelect>
             </div>
           </div>
 
           <div className="space-y-1.5">
             <Label htmlFor="description">Descripción</Label>
-            <Textarea
+            <Textarea className="min-h-[88px] md:min-h-0"
               id="description"
               placeholder="¿De qué trata este proyecto?"
               value={description}
@@ -139,23 +146,43 @@ export function NewProjectForm() {
                   key={c}
                   type="button"
                   onClick={() => setColor(c)}
-                  className={`h-7 w-7 rounded-full transition-transform hover:scale-110 ${color === c ? 'ring-2 ring-offset-2 ring-indigo-500 scale-110' : ''}`}
+                  className={`h-7 w-7 rounded-full transition-transform hover:scale-110 ${color === c ? 'ring-2 ring-offset-2 ring-signal scale-110' : ''}`}
                   style={{ backgroundColor: c }}
                 />
               ))}
+            </div>
+          </div>
+
+          {/* Visibility */}
+          <div className="space-y-1.5">
+            <Label>Visibilidad</Label>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+              <VisibilityOption
+                kind="workspace"
+                active={visibility === 'workspace'}
+                onClick={() => setVisibility('workspace')}
+              />
+              <VisibilityOption
+                kind="private"
+                active={visibility === 'private'}
+                onClick={() => setVisibility('private')}
+              />
+              <VisibilityOption
+                kind="personal"
+                active={visibility === 'personal'}
+                onClick={() => setVisibility('personal')}
+              />
             </div>
           </div>
         </section>
 
         {/* Estado */}
         <section className="space-y-4">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">Estado inicial</h2>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-graphite">Estado inicial</h2>
           <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1.5">
               <Label>Estado</Label>
-              <Select value={status} onValueChange={setStatus}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
+              <ResponsiveSelect value={status} onValueChange={setStatus}>
                   <SelectItem value="not_started">No iniciado</SelectItem>
                   <SelectItem value="in_progress">En progreso</SelectItem>
                   <SelectItem value="pending">Pendiente</SelectItem>
@@ -163,15 +190,12 @@ export function NewProjectForm() {
                   <SelectItem value="delayed">Retrasado</SelectItem>
                   <SelectItem value="completed">Completado</SelectItem>
                   <SelectItem value="canceled">Cancelado</SelectItem>
-                </SelectContent>
-              </Select>
+                </ResponsiveSelect>
             </div>
 
             <div className="space-y-1.5">
               <Label>Etapa kanban</Label>
-              <Select value={kanbanStage} onValueChange={setKanbanStage}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
+              <ResponsiveSelect value={kanbanStage} onValueChange={setKanbanStage}>
                   <SelectItem value="ideas">💡 Ideas</SelectItem>
                   <SelectItem value="backlog">📋 Backlog</SelectItem>
                   <SelectItem value="pending">⏳ Pendiente</SelectItem>
@@ -179,69 +203,109 @@ export function NewProjectForm() {
                   <SelectItem value="on_hold">⏸️ En pausa</SelectItem>
                   <SelectItem value="completed">✅ Completado</SelectItem>
                   <SelectItem value="canceled">❌ Cancelado</SelectItem>
-                </SelectContent>
-              </Select>
+                </ResponsiveSelect>
             </div>
 
             <div className="space-y-1.5">
               <Label>Prioridad</Label>
-              <Select value={priority} onValueChange={setPriority}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
+              <ResponsiveSelect value={priority} onValueChange={setPriority}>
                   <SelectItem value="very_high">🔴 Muy alta</SelectItem>
                   <SelectItem value="high">🟠 Alta</SelectItem>
                   <SelectItem value="medium">🟡 Media</SelectItem>
                   <SelectItem value="low">🟢 Baja</SelectItem>
                   <SelectItem value="very_low">⚪ Muy baja</SelectItem>
-                </SelectContent>
-              </Select>
+                </ResponsiveSelect>
             </div>
           </div>
         </section>
 
         {/* Fechas */}
         <section className="space-y-4">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">Fechas y estimación</h2>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-graphite">Fechas y estimación</h2>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="start">Fecha inicio</Label>
-              <Input id="start" type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
+              <Input className="h-12 md:h-9" id="start" type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="end">Fecha fin</Label>
-              <Input id="end" type="date" value={endDate} onChange={e => setEndDate(e.target.value)} />
+              <Input className="h-12 md:h-9" id="end" type="date" value={endDate} onChange={e => setEndDate(e.target.value)} />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="hours">Horas estimadas</Label>
-              <Input id="hours" type="number" min={0} placeholder="0" value={estimatedHours} onChange={e => setEstimatedHours(e.target.value)} />
+              <Input className="h-12 md:h-9" id="hours" type="number" inputMode="numeric" min={0} placeholder="0" value={estimatedHours} onChange={e => setEstimatedHours(e.target.value)} />
             </div>
             <div className="space-y-1.5">
               <Label>Presupuesto</Label>
               <div className="flex gap-2">
-                <Input type="number" min={0} placeholder="0" value={budget} onChange={e => setBudget(e.target.value)} />
-                <Select value={currency} onValueChange={setCurrency}>
-                  <SelectTrigger className="w-24 shrink-0"><SelectValue /></SelectTrigger>
-                  <SelectContent>
+                <Input className="h-12 md:h-9" type="number" inputMode="numeric" min={0} placeholder="0" value={budget} onChange={e => setBudget(e.target.value)} />
+                <ResponsiveSelect value={currency} onValueChange={setCurrency}>
                     <SelectItem value="USD">USD</SelectItem>
                     <SelectItem value="ARS">ARS</SelectItem>
                     <SelectItem value="EUR">EUR</SelectItem>
-                  </SelectContent>
-                </Select>
+                  </ResponsiveSelect>
               </div>
             </div>
           </div>
         </section>
 
         {/* Actions */}
-        <div className="flex items-center justify-end gap-3 border-t border-slate-100 pt-6">
-          <Button type="button" variant="ghost" onClick={() => router.back()}>
+        <div className="sticky bottom-0 z-10 -mx-4 flex items-center gap-3 border-t border-border-soft bg-background/90 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-xl md:static md:mx-0 md:justify-end md:border-border-soft md:bg-transparent md:px-0 md:pb-0 md:pt-6 md:backdrop-blur-none">
+          <Button type="button" variant="ghost" className="h-12 flex-1 md:h-9 md:flex-none" onClick={() => router.back()}>
             Cancelar
           </Button>
-          <Button type="submit" disabled={!name.trim() || !code.trim() || create.isPending}>
+          <Button type="submit" className="h-12 flex-[1.6] md:h-9 md:flex-none" disabled={!name.trim() || !code.trim() || create.isPending}>
             {create.isPending ? 'Creando…' : 'Crear proyecto'}
           </Button>
         </div>
       </form>
     </div>
+  )
+}
+
+function VisibilityOption({
+  kind,
+  active,
+  onClick,
+}: {
+  kind: 'workspace' | 'private' | 'personal'
+  active: boolean
+  onClick: () => void
+}) {
+  const meta = {
+    workspace: {
+      icon: Globe,
+      title: 'Workspace',
+      desc: 'Visible para todos los miembros del workspace',
+      iconBg: 'bg-signal-wash text-night dark:bg-signal/40 dark:text-signal',
+    },
+    private: {
+      icon: Lock,
+      title: 'Privado',
+      desc: 'Solo los miembros explícitos del proyecto',
+      iconBg: 'bg-signal-wash text-signal-ink dark:bg-signal/40 dark:text-signal/50',
+    },
+    personal: {
+      icon: User,
+      title: 'Personal',
+      desc: 'Solo tú lo ves (tareas de casa, side projects)',
+      iconBg: 'bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300',
+    },
+  }[kind]
+  const Icon = meta.icon
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex items-start gap-2.5 rounded-lg border p-2.5 text-left transition-all active:scale-[0.98] ${active ? 'border-signal bg-signal-wash/40 ring-1 ring-signal dark:bg-signal/20' : 'border-stone bg-white hover:border-stone dark:border-ink-body dark:bg-night dark:hover:border-graphite'}`}
+    >
+      <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${meta.iconBg}`}>
+        <Icon className="h-3.5 w-3.5" />
+      </span>
+      <span className="min-w-0">
+        <span className="block text-xs font-semibold text-night dark:text-stone-100">{meta.title}</span>
+        <span className="block text-[11px] leading-tight text-graphite dark:text-graphite">{meta.desc}</span>
+      </span>
+    </button>
   )
 }

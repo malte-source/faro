@@ -7,8 +7,10 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { SelectItem } from '@/components/ui/select'
+import { ResponsiveSelect } from '@/components/projects/mobile-bits'
 import type { TaskStatus } from '@/types/database'
+import { toast } from '@/components/ui/toaster'
 
 interface Props {
   open: boolean
@@ -30,7 +32,9 @@ export function AddTaskDialog({ open, onOpenChange, projectId, defaultStatus = '
 
   const create = trpc.tasks.create.useMutation({
     onSuccess: () => {
-      utils.tasks.byProject.invalidate(projectId)
+      toast.success('Tarea creada')
+      utils.tasks.invalidate()
+      utils.projects.invalidate()
       setTitle('')
       setDescription('')
       setPriority('medium')
@@ -39,6 +43,7 @@ export function AddTaskDialog({ open, onOpenChange, projectId, defaultStatus = '
       onOpenChange(false)
       onCreated?.()
     },
+    onError: (e) => toast.error('No se pudo crear la tarea', e.message),
   })
 
   function handleSubmit(e: React.FormEvent) {
@@ -66,7 +71,7 @@ export function AddTaskDialog({ open, onOpenChange, projectId, defaultStatus = '
           <div className="space-y-4 px-6 pb-2">
             <div className="space-y-1.5">
               <Label htmlFor="task-title">Título *</Label>
-              <Input
+              <Input className="h-12 md:h-9"
                 id="task-title"
                 placeholder="¿Qué hay que hacer?"
                 value={title}
@@ -77,7 +82,7 @@ export function AddTaskDialog({ open, onOpenChange, projectId, defaultStatus = '
 
             <div className="space-y-1.5">
               <Label htmlFor="task-desc">Descripción</Label>
-              <Textarea
+              <Textarea className="min-h-[88px] md:min-h-0"
                 id="task-desc"
                 placeholder="Detalles opcionales..."
                 value={description}
@@ -89,21 +94,18 @@ export function AddTaskDialog({ open, onOpenChange, projectId, defaultStatus = '
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>Prioridad</Label>
-                <Select value={priority} onValueChange={setPriority}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
+                <ResponsiveSelect value={priority} onValueChange={setPriority}>
                     <SelectItem value="very_high">Muy alta</SelectItem>
                     <SelectItem value="high">Alta</SelectItem>
                     <SelectItem value="medium">Media</SelectItem>
                     <SelectItem value="low">Baja</SelectItem>
                     <SelectItem value="very_low">Muy baja</SelectItem>
-                  </SelectContent>
-                </Select>
+                  </ResponsiveSelect>
               </div>
 
               <div className="space-y-1.5">
                 <Label htmlFor="task-due">Fecha límite</Label>
-                <Input
+                <Input className="h-12 md:h-9"
                   id="task-due"
                   type="date"
                   value={dueDate}
@@ -114,19 +116,16 @@ export function AddTaskDialog({ open, onOpenChange, projectId, defaultStatus = '
 
             <div className="space-y-1.5">
               <Label>Responsable</Label>
-              <Select value={assigneeId} onValueChange={setAssigneeId}>
-                <SelectTrigger><SelectValue placeholder="Sin asignar" /></SelectTrigger>
-                <SelectContent>
+              <ResponsiveSelect value={assigneeId} onValueChange={setAssigneeId}>
                   <SelectItem value="none">Sin asignar</SelectItem>
                   {members?.map(m => (
                     <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
                   ))}
-                </SelectContent>
-              </Select>
+                </ResponsiveSelect>
             </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="sticky bottom-0 z-10 bg-surface md:static">
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>

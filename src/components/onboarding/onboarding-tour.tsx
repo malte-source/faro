@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { X, ChevronRight, ChevronLeft, Anchor, Sparkles } from 'lucide-react'
+import { X, ChevronRight, ChevronLeft, Sparkles, Compass } from 'lucide-react'
 
 const STORAGE_KEY = 'faro:onboarding:v1'
 
@@ -24,7 +24,7 @@ const STEPS: TourStep[] = [
   {
     id: 'sidebar-nav',
     title: 'Navegación principal',
-    body: 'Accedé a proyectos, tareas, calendario, reportes y más desde el menú lateral.',
+    body: 'Accede a proyectos, tareas, calendario, reportes y más desde el menú lateral.',
     target: 'aside',
     placement: 'right',
     spotlight: true,
@@ -32,7 +32,7 @@ const STEPS: TourStep[] = [
   {
     id: 'new-task',
     title: 'Crear tareas rápido',
-    body: 'Presioná la tecla N en cualquier momento para crear una tarea al instante, sin perder el contexto.',
+    body: 'Presiona la tecla N en cualquier momento para crear una tarea al instante, sin perder el contexto.',
     target: '[data-tour="quick-create"]',
     placement: 'right',
     spotlight: true,
@@ -40,7 +40,7 @@ const STEPS: TourStep[] = [
   {
     id: 'command-palette',
     title: 'Paleta de comandos',
-    body: 'Presioná ⌘K (o Ctrl+K) para buscar proyectos, tareas y navegar a cualquier sección sin tocar el mouse.',
+    body: 'Presiona ⌘K (o Ctrl+K) para buscar proyectos, tareas y navegar a cualquier sección sin tocar el mouse.',
     target: '[data-tour="search-trigger"]',
     placement: 'right',
     spotlight: true,
@@ -48,13 +48,13 @@ const STEPS: TourStep[] = [
   {
     id: 'projects',
     title: 'Tus proyectos',
-    body: 'Creá tu primer proyecto desde la sección Proyectos. Podés asignar tareas, equipo, fechas y mucho más.',
+    body: 'Crea tu primer proyecto desde la sección Proyectos. Puedes asignar tareas, equipo, fechas y mucho más.',
     placement: 'center',
   },
   {
     id: 'done',
     title: '¡Listo para zarpar!',
-    body: 'Ya conocés lo esencial. Si querés volver a ver este tour, encontralo en Configuración → Ayuda.',
+    body: 'Ya conoces lo esencial. Si quieres volver a ver este tour, encuéntralo en Configuración → Ayuda.',
     placement: 'center',
   },
 ]
@@ -145,6 +145,25 @@ export function OnboardingTour() {
     return () => window.removeEventListener('resize', updatePosition)
   }, [updatePosition])
 
+  // Skip-when-target-missing: if the current step references a CSS target that
+  // isn't in the DOM (eg. user is on a route where the sidebar isn't mounted,
+  // or the data-tour attribute was renamed), auto-advance instead of freezing
+  // with no spotlight. Without this the user sees the tour text but no anchor
+  // and gets stuck wondering "what should I look at?".
+  useEffect(() => {
+    if (!visible || !step?.target) return
+    const t = setTimeout(() => {
+      if (!document.querySelector(step.target!)) {
+        if (stepIdx < STEPS.length - 1) setStepIdx(i => i + 1)
+        else {
+          localStorage.setItem(STORAGE_KEY, 'done')
+          setVisible(false)
+        }
+      }
+    }, 60)  // small delay to allow lazy-mounted targets to attach
+    return () => clearTimeout(t)
+  }, [stepIdx, visible, step])
+
   function dismiss() {
     localStorage.setItem(STORAGE_KEY, 'done')
     setVisible(false)
@@ -178,21 +197,34 @@ export function OnboardingTour() {
         className="fixed inset-0 z-[70]"
         style={{
           background: spotlightRect
-            ? `radial-gradient(ellipse ${spotlightRect.width + 24}px ${spotlightRect.height + 24}px at ${spotlightRect.left + spotlightRect.width / 2}px ${spotlightRect.top + spotlightRect.height / 2}px, transparent 0%, rgba(15,23,42,0.65) 60%)`
-            : 'rgba(15,23,42,0.55)',
+            ? `radial-gradient(ellipse ${spotlightRect.width + 24}px ${spotlightRect.height + 24}px at ${spotlightRect.left + spotlightRect.width / 2}px ${spotlightRect.top + spotlightRect.height / 2}px, transparent 0%, rgba(10,26,38,0.7) 60%)`
+            : 'rgba(10,26,38,0.6)',
         }}
       />
 
-      {/* Tooltip */}
+      {/* Señal ring around the spotlighted target */}
+      {spotlightRect && (
+        <div
+          className="pointer-events-none fixed z-[71] rounded-xl ring-2 ring-signal"
+          style={{
+            top: spotlightRect.top - 6,
+            left: spotlightRect.left - 6,
+            width: spotlightRect.width + 12,
+            height: spotlightRect.height + 12,
+          }}
+        />
+      )}
+
+      {/* Tooltip — Noche reverse-out, per brand (dark tooltip on any surface) */}
       <div
         ref={tooltipRef}
-        className="fixed z-[80] w-80 rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900"
+        className="fixed z-[80] w-80 rounded-2xl border border-signal/20 bg-night shadow-2xl"
         style={{ top: pos.top, left: pos.left }}
       >
         {/* Progress bar */}
-        <div className="h-1 w-full overflow-hidden rounded-t-2xl bg-slate-100 dark:bg-slate-800">
+        <div className="h-1 w-full overflow-hidden rounded-t-2xl bg-night-700">
           <div
-            className="h-full rounded-full bg-indigo-500 transition-all duration-300"
+            className="h-full rounded-full bg-signal transition-all duration-300"
             style={{ width: `${progress}%` }}
           />
         </div>
@@ -200,16 +232,16 @@ export function OnboardingTour() {
         {/* Header */}
         <div className="flex items-center justify-between px-4 pt-3 pb-1">
           <div className="flex items-center gap-2">
-            <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-indigo-600">
-              {isLast ? <Sparkles className="h-3.5 w-3.5 text-white" /> : <Anchor className="h-3.5 w-3.5 text-white" />}
+            <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-night-700">
+              {isLast ? <Sparkles className="h-3.5 w-3.5 text-signal" /> : <Compass className="h-3.5 w-3.5 text-signal" />}
             </div>
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+            <span className="font-mono text-[11px] font-semibold uppercase tracking-wider text-signal">
               {stepIdx + 1} / {STEPS.length}
             </span>
           </div>
           <button
             onClick={dismiss}
-            className="rounded-md p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 dark:text-slate-500 dark:hover:bg-slate-800 dark:hover:text-slate-300"
+            className="rounded-md p-1 text-[#9DB0BC] transition-colors hover:bg-night-700 hover:text-mist"
             title="Saltar tour"
           >
             <X className="h-3.5 w-3.5" />
@@ -218,19 +250,19 @@ export function OnboardingTour() {
 
         {/* Content */}
         <div className="px-4 pb-4">
-          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-1.5">
+          <h3 className="font-display text-sm font-bold text-mist mb-1.5">
             {step.title}
           </h3>
-          <p className="text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+          <p className="text-xs leading-relaxed text-[#9DB0BC]">
             {step.body}
           </p>
         </div>
 
         {/* Actions */}
-        <div className="flex items-center justify-between border-t border-slate-100 px-4 py-3 dark:border-slate-800">
+        <div className="flex items-center justify-between border-t border-[#17313F] px-4 py-3">
           <button
             onClick={dismiss}
-            className="text-xs text-slate-400 transition-colors hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
+            className="text-xs text-[#9DB0BC] transition-colors hover:text-mist"
           >
             Saltar
           </button>
@@ -238,7 +270,7 @@ export function OnboardingTour() {
             {!isFirst && (
               <button
                 onClick={prev}
-                className="flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
+                className="flex items-center gap-1 rounded-lg border border-[#1E3A4C] px-3 py-1.5 text-xs font-medium text-[#9DB0BC] transition-colors hover:bg-night-700"
               >
                 <ChevronLeft className="h-3.5 w-3.5" />
                 Atrás
@@ -246,7 +278,7 @@ export function OnboardingTour() {
             )}
             <button
               onClick={next}
-              className="flex items-center gap-1 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-indigo-700 active:scale-95"
+              className="flex items-center gap-1 rounded-lg bg-signal px-3 py-1.5 text-xs font-semibold text-night transition-colors hover:bg-[#F0A30F] active:scale-95"
             >
               {isLast ? '¡Empezar!' : 'Siguiente'}
               {!isLast && <ChevronRight className="h-3.5 w-3.5" />}

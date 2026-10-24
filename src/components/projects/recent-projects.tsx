@@ -24,9 +24,9 @@ type ProjectRow = {
 function ProjectList({ projects, isLoading }: { projects?: ProjectRow[]; isLoading: boolean }) {
   if (isLoading) {
     return (
-      <div className="divide-y divide-slate-100">
+      <div className="divide-y divide-border-soft">
         {[...Array(5)].map((_, i) => (
-          <div key={i} className="flex items-center gap-4 px-6 py-3">
+          <div key={i} className="flex items-center gap-4 px-4 py-3 md:px-6">
             <Skeleton className="h-4 w-4 rounded-full" />
             <div className="flex-1 space-y-1.5">
               <Skeleton className="h-4 w-48" />
@@ -41,9 +41,9 @@ function ProjectList({ projects, isLoading }: { projects?: ProjectRow[]; isLoadi
 
   if (!projects?.length) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+      <div className="flex flex-col items-center justify-center py-12 text-graphite">
         <p className="text-sm">No hay proyectos todavía</p>
-        <Link href="/dashboard/projects/new" className="mt-2 text-xs text-indigo-600 hover:underline">
+        <Link href="/dashboard/projects/new" className="mt-2 text-xs text-signal-ink hover:underline">
           Crear el primero
         </Link>
       </div>
@@ -51,7 +51,7 @@ function ProjectList({ projects, isLoading }: { projects?: ProjectRow[]; isLoadi
   }
 
   return (
-    <div className="divide-y divide-slate-100">
+    <div className="divide-y divide-border-soft">
       {projects.map(project => {
         const statusInfo = PROJECT_STATUS[project.status as keyof typeof PROJECT_STATUS]
         const priorityInfo = PRIORITY[project.priority as keyof typeof PRIORITY]
@@ -59,31 +59,31 @@ function ProjectList({ projects, isLoading }: { projects?: ProjectRow[]; isLoadi
           <Link
             key={project.id}
             href={`/dashboard/projects/${project.id}`}
-            className="flex items-center gap-4 px-6 py-3 transition-colors hover:bg-slate-50"
+            className="flex min-h-[60px] items-center gap-3 px-4 py-3 transition-colors active:bg-border-soft md:gap-4 md:px-6 md:hover:bg-background"
           >
             <div className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: project.color }} />
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium text-slate-900">
-                <span className="mr-1.5 text-slate-400">{project.code}</span>
+              <p className="truncate text-sm font-medium text-foreground">
+                <span className="mr-1.5 text-graphite">{project.code}</span>
                 {project.name}
               </p>
               <div className="mt-0.5 flex items-center gap-2">
-                <span className={`text-xs font-medium ${priorityInfo?.color ?? 'text-slate-500'}`}>
+                <span className={`text-xs font-medium ${priorityInfo?.color ?? 'text-graphite'}`}>
                   {priorityInfo?.label}
                 </span>
                 {project.end_date && (
-                  <span className="flex items-center gap-1 text-xs text-slate-400">
+                  <span className="flex items-center gap-1 text-xs text-graphite">
                     <Calendar className="h-3 w-3" />
                     {formatDate(project.end_date)}
                   </span>
                 )}
               </div>
             </div>
-            <Badge variant={statusBadgeVariant(project.status)}>{statusInfo?.label}</Badge>
-            <div className="flex w-16 flex-col gap-1">
-              <span className="text-xs text-slate-400">{project.progress_pct}%</span>
-              <div className="h-1 w-full overflow-hidden rounded-full bg-slate-100">
-                <div className="h-full rounded-full bg-indigo-500" style={{ width: `${project.progress_pct}%` }} />
+            <Badge variant={statusBadgeVariant(project.status)} className="hidden sm:inline-flex">{statusInfo?.label}</Badge>
+            <div className="flex w-12 flex-col gap-1 sm:w-16">
+              <span className="text-xs text-graphite">{project.progress_pct}%</span>
+              <div className="h-1 w-full overflow-hidden rounded-full bg-border-soft">
+                <div className="h-full rounded-full bg-signal" style={{ width: `${project.progress_pct}%` }} />
               </div>
             </div>
           </Link>
@@ -103,9 +103,9 @@ export function RecentProjects({ compact }: RecentProjectsProps) {
   if (compact) {
     return (
       <Card>
-        <CardHeader className="flex-row items-center justify-between pb-2">
+        <CardHeader className="flex-row items-center justify-between p-4 pb-2 md:p-6 md:pb-2">
           <CardTitle>Proyectos recientes</CardTitle>
-          <Link href="/dashboard/projects" className="flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-800">
+          <Link href="/dashboard/projects" className="flex min-h-[44px] items-center gap-1 text-[13px] font-medium text-signal-ink md:min-h-0 md:text-xs md:hover:text-foreground">
             Ver todos <ArrowRight className="h-3 w-3" />
           </Link>
         </CardHeader>
@@ -122,7 +122,7 @@ export function RecentProjects({ compact }: RecentProjectsProps) {
         <Card>
           <CardHeader className="flex-row items-center justify-between pb-2">
             <CardTitle>Proyectos recientes</CardTitle>
-            <Link href="/dashboard/projects" className="flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-800">
+            <Link href="/dashboard/projects" className="flex items-center gap-1 text-xs text-signal-ink hover:text-foreground">
               Ver todos <ArrowRight className="h-3 w-3" />
             </Link>
           </CardHeader>
@@ -146,9 +146,9 @@ function DueSoonList() {
 
   if (isLoading) {
     return (
-      <div className="divide-y divide-slate-100">
+      <div className="divide-y divide-border-soft">
         {[...Array(3)].map((_, i) => (
-          <div key={i} className="px-6 py-3 space-y-1">
+          <div key={i} className="space-y-1 px-4 py-3 md:px-6">
             <Skeleton className="h-4 w-36" />
             <Skeleton className="h-3 w-20" />
           </div>
@@ -159,23 +159,23 @@ function DueSoonList() {
 
   const dueSoon = data?.dueSoon ?? []
   if (!dueSoon.length) {
-    return <div className="flex items-center justify-center py-8 text-slate-400 text-sm">Sin vencimientos esta semana</div>
+    return <div className="flex items-center justify-center py-8 text-graphite text-sm">Sin vencimientos esta semana</div>
   }
 
   return (
-    <div className="divide-y divide-slate-100">
+    <div className="divide-y divide-border-soft">
       {dueSoon.map(project => {
         const days = project.end_date ? daysUntil(project.end_date) : null
         return (
           <Link key={project.id} href={`/dashboard/projects/${project.id}`}
-            className="block px-6 py-3 transition-colors hover:bg-slate-50"
+            className="block min-h-[56px] px-4 py-3 transition-colors active:bg-border-soft md:px-6 md:hover:bg-background"
           >
-            <p className="text-sm font-medium text-slate-900 truncate">
-              <span className="mr-1 text-slate-400 text-xs">{(project as { code?: string }).code}</span>
+            <p className="text-sm font-medium text-foreground truncate">
+              <span className="mr-1 text-graphite text-xs">{(project as { code?: string }).code}</span>
               {(project as { name?: string }).name ?? project.id}
             </p>
             {days !== null && (
-              <p className={`text-xs mt-0.5 ${days <= 0 ? 'text-red-600 font-medium' : days <= 2 ? 'text-orange-600' : 'text-slate-400'}`}>
+              <p className={`text-xs mt-0.5 ${days <= 0 ? 'text-danger font-medium' : days <= 2 ? 'text-signal-ink' : 'text-graphite'}`}>
                 {days <= 0 ? 'Vencido' : `Vence en ${days} día${days !== 1 ? 's' : ''}`}
               </p>
             )}

@@ -3,28 +3,149 @@
 /* Tailwind v4 — class-based dark mode via next-themes */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/*
+ * FARO brand tokens — single source of truth for the "Noche + Señal" palette.
+ * Replaces the previous navy/cyan lighthouse tokens.
+ *
+ * Naming (per Manual de Marca Faro):
+ *   noche    = tinta principal + acción primaria + fondo de símbolo (#0A1A26)
+ *   señal    = acento (activo, progreso, foco, análisis IA). Uso escaso.
+ *   mist     = fondo de app cálido (#F7F4EF)
+ *   stone    = borde neutro (#E0D9CE)
+ *   graphite = texto secundario (#55636B)
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #F7F4EF;
+  --foreground: #0A1A26;
+  --surface: #FFFFFF;
+  --border: #E0D9CE;
+  --border-soft: #F0EBE3;
+  --muted: #55636B;
+  /* Body text: dark ink on light, light ink on Noche (ink-body stays a fixed dark swatch for dark-mode borders) */
+  --body: #243743;
+
+  /* Brand */
+  --night: #0A1A26;
+  --night-700: #12293A;
+  --petrol: #103A4C;
+  --signal: #FFB020;
+  --signal-ink: #C67A08;
+  --signal-wash: #FFFBF2;
+  --mist: #F7F4EF;
+  --stone: #E0D9CE;
+  --stone-100: #F0EBE3;
+  --graphite: #55636B;
+  --ink-body: #243743;
+
+  /* Status */
+  --success: #17876A;
+  --success-wash: #E7F2EE;
+  --danger: #C8453A;
+  --danger-wash: #FAEAE8;
+  --info: #2E6F9E;
+
+  /* Charts (recharts series order) */
+  --chart-1: #0A1A26;
+  --chart-2: #FFB020;
+  --chart-3: #17876A;
+  --chart-4: #7E6BB8;
+  --chart-5: #2E6F9E;
+  --chart-6: #C8453A;
+
+  /* Google ribbon (kept — official brand colors on login) */
+  --google-blue: #4285F4;
+  --google-green: #34A853;
+  --google-yellow: #FBBC05;
+  --google-red: #EA4335;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-surface: var(--surface);
+  --color-night: var(--night);
+  --color-night-700: var(--night-700);
+  --color-petrol: var(--petrol);
+  --color-signal: var(--signal);
+  --color-signal-ink: var(--signal-ink);
+  --color-signal-wash: var(--signal-wash);
+  --color-mist: var(--mist);
+  --color-stone: var(--stone);
+  --color-stone-100: var(--stone-100);
+  --color-graphite: var(--graphite);
+  --color-ink-body: var(--ink-body);
+  --color-body: var(--body);
+  --color-border: var(--border);
+  --color-border-soft: var(--border-soft);
+  --color-muted: var(--muted);
+  --color-success: var(--success);
+  --color-success-wash: var(--success-wash);
+  --color-danger: var(--danger);
+  --color-danger-wash: var(--danger-wash);
+  --color-info: var(--info);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-chart-6: var(--chart-6);
+
+  --font-sans: var(--font-plex-sans);
+  --font-display: var(--font-archivo);
+  --font-mono: var(--font-plex-mono);
+
+  /*
+   * ── Migration safety net — TEMPORARY ─────────────────────────────────
+   * Remap Tailwind's `indigo-*` and `slate-*` palettes to Faro equivalents
+   * so any legacy `bg-indigo-600` / `text-slate-500` still in the tree
+   * doesn't visually break during the rebrand. Removed in R6 once the
+   * `grep -rn "indigo-\|slate-"` is empty across src/.
+   */
+  --color-indigo-50:  #FFFBF2;
+  --color-indigo-100: #FFF4D6;
+  --color-indigo-200: #FFE4A6;
+  --color-indigo-300: #FFD070;
+  --color-indigo-400: #FFC040;
+  --color-indigo-500: #FFB020;
+  --color-indigo-600: #C67A08;
+  --color-indigo-700: #A5670A;
+  --color-indigo-800: #7A4D08;
+  --color-indigo-900: #4A2F05;
+  --color-indigo-950: #2A1B02;
+
+  --color-slate-50:  #F7F4EF;
+  --color-slate-100: #F0EBE3;
+  --color-slate-200: #E0D9CE;
+  --color-slate-300: #C6BEB1;
+  --color-slate-400: #8B99A2;
+  --color-slate-500: #55636B;
+  --color-slate-600: #3E4B54;
+  --color-slate-700: #243743;
+  --color-slate-800: #12293A;
+  --color-slate-900: #0A1A26;
+  --color-slate-950: #050E14;
 }
 
-/* Dark mode via .dark class (next-themes) */
+/*
+ * Dark mode — Noche as the base rather than slate-900. Surfaces step up
+ * to night-700 for elevated blocks (cards, panels).
+ */
 .dark {
-  --background: #0f172a;
-  --foreground: #f1f5f9;
+  --background: #0A1A26;
+  --foreground: #F7F4EF;
+  --surface: #12293A;
+  --border: #1E3A4C;
+  --border-soft: #17313F;
+  --muted: #9DB0BC;
+  --body: #D6DEE3;
+  /* Secondary text must stay readable on Noche: #55636B is only ~3:1 there. */
+  --graphite: #9DB0BC;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-plex-sans), system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
 /* iOS safe area support for bottom nav */
@@ -40,4 +161,33 @@ body {
 /* Prevent pull-to-refresh on mobile */
 html, body {
   overscroll-behavior: none;
+}
+
+/*
+ * Focus ring — Signal, always visible. Applied globally via :focus-visible
+ * so components inherit without opting in. Accessibility requirement, not
+ * decorative.
+ */
+:where(:focus-visible) {
+  outline: 2px solid var(--signal);
+  outline-offset: 2px;
+}
+
+/*
+ * Mobile feel — iOS / One UI behaviours.
+ * No page-level rubber banding or native pull-to-refresh (Faro draws its own),
+ * no grey tap flash, inputs at 16px so iOS never zooms on focus, thumb-sized targets.
+ */
+@media (max-width: 767px) {
+  html, body { overscroll-behavior-y: none; -webkit-text-size-adjust: 100%; }
+  body { -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; }
+  input:not([type="checkbox"]):not([type="radio"]), select, textarea { font-size: 16px; }
+  button, a, [role="button"], summary { touch-action: manipulation; }
+  /* Selection and callouts stay available in content, but not on controls. */
+  button, nav a { -webkit-user-select: none; user-select: none; }
+}
+.pt-safe { padding-top: env(safe-area-inset-top); }
+.pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+@media (prefers-reduced-motion: reduce) {
+  * { scroll-behavior: auto !important; }
 }

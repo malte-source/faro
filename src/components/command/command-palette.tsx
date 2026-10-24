@@ -9,10 +9,11 @@ import {
   Search, LayoutDashboard, FolderKanban, Kanban, CheckSquare,
   CalendarDays, BarChart3, Users, Settings, Plus, LogOut,
   ArrowRight, FolderOpen, Hash,
+  LayoutGrid, GanttChartSquare, CalendarCheck, Flame, Zap, Repeat, Gauge,
 } from 'lucide-react'
 import { PROJECT_STATUS, PRIORITY } from '@/lib/utils'
 import type { TaskStatus } from '@/types/database'
-import { logout } from '@/app/actions/auth'
+import { signOutAndClear } from '@/lib/sign-out'
 import { cn } from '@/lib/utils'
 
 const TASK_STATUS_LABEL: Record<TaskStatus, string> = {
@@ -102,13 +103,20 @@ export function CommandPalette() {
     { id: 'nav-kanban', label: 'Kanban', description: 'Portafolio por etapa', icon: <Kanban className="h-4 w-4" />, action: () => navigate('/dashboard/kanban'), group: 'Navegar', shortcut: 'G K' },
     { id: 'nav-tasks', label: 'Tareas', description: 'Todas las tareas', icon: <CheckSquare className="h-4 w-4" />, action: () => navigate('/dashboard/tasks'), group: 'Navegar', shortcut: 'G T' },
     { id: 'nav-calendar', label: 'Calendario', description: 'Vista de calendario', icon: <CalendarDays className="h-4 w-4" />, action: () => navigate('/dashboard/calendar'), group: 'Navegar' },
+    { id: 'nav-eisenhower', label: 'Matriz Eisenhower', description: 'Urgente vs Importante', icon: <LayoutGrid className="h-4 w-4" />, action: () => navigate('/dashboard/eisenhower'), group: 'Navegar' },
+    { id: 'nav-gantt', label: 'Gantt', description: 'Timeline de proyectos', icon: <GanttChartSquare className="h-4 w-4" />, action: () => navigate('/dashboard/gantt'), group: 'Navegar' },
+    { id: 'nav-today', label: 'Mi día', description: 'Tus tareas de hoy', icon: <CalendarCheck className="h-4 w-4" />, action: () => navigate('/dashboard/today'), group: 'Navegar' },
+    { id: 'nav-priorities', label: 'Prioridades', description: 'Lo más urgente del equipo', icon: <Flame className="h-4 w-4" />, action: () => navigate('/dashboard/priorities'), group: 'Navegar' },
+    { id: 'nav-automations', label: 'Automatizaciones', description: 'Reglas si-esto-entonces-aquello', icon: <Zap className="h-4 w-4" />, action: () => navigate('/dashboard/automations'), group: 'Navegar' },
+    { id: 'nav-recurring', label: 'Recurrentes', description: 'Tareas que se materializan automáticamente', icon: <Repeat className="h-4 w-4" />, action: () => navigate('/dashboard/recurring'), group: 'Navegar' },
+    { id: 'nav-capacity', label: 'Capacidad del equipo', description: 'Carga real por persona', icon: <Gauge className="h-4 w-4" />, action: () => navigate('/dashboard/capacity'), group: 'Navegar' },
     { id: 'nav-reports', label: 'Reportes', description: 'Métricas y analytics', icon: <BarChart3 className="h-4 w-4" />, action: () => navigate('/dashboard/reports'), group: 'Navegar' },
     { id: 'nav-team', label: 'Equipo', description: 'Gestión del equipo', icon: <Users className="h-4 w-4" />, action: () => navigate('/dashboard/team'), group: 'Navegar' },
     { id: 'nav-settings', label: 'Configuración', description: 'Ajustes de la cuenta', icon: <Settings className="h-4 w-4" />, action: () => navigate('/dashboard/settings'), group: 'Navegar' },
     // Actions
     { id: 'act-new-task', label: 'Nueva tarea', description: 'Crear una tarea rápida', icon: <Plus className="h-4 w-4" />, action: () => { close(); window.dispatchEvent(new KeyboardEvent('keydown', { key: 'n', bubbles: true })) }, group: 'Acciones', shortcut: 'N' },
     { id: 'act-new-project', label: 'Nuevo proyecto', description: 'Crear un proyecto', icon: <FolderOpen className="h-4 w-4" />, action: () => navigate('/dashboard/projects?new=1'), group: 'Acciones' },
-    { id: 'act-logout', label: 'Cerrar sesión', description: 'Salir de Faro', icon: <LogOut className="h-4 w-4" />, action: async () => { close(); await logout() }, group: 'Acciones' },
+    { id: 'act-logout', label: 'Cerrar sesión', description: 'Salir de Faro', icon: <LogOut className="h-4 w-4" />, action: async () => { close(); await signOutAndClear() }, group: 'Acciones' },
   // eslint-disable-next-line react-hooks/exhaustive-deps
   ], [])
 
@@ -248,26 +256,26 @@ export function CommandPalette() {
     <div className="fixed inset-0 z-[60] flex items-start justify-center px-4 pt-[14vh]">
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+        className="absolute inset-0 bg-night/60 backdrop-blur-sm"
         onClick={close}
       />
 
       {/* Panel */}
-      <div className="relative z-10 w-full max-w-2xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+      <div className="relative z-10 w-full max-w-2xl overflow-hidden rounded-2xl border border-stone bg-white shadow-2xl dark:border-ink-body dark:bg-night">
         {/* Input */}
-        <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-3.5 dark:border-slate-800">
-          <Search className="h-4 w-4 shrink-0 text-slate-400 dark:text-slate-500" />
+        <div className="flex items-center gap-3 border-b border-stone-100 px-4 py-3.5 dark:border-night-700">
+          <Search className="h-4 w-4 shrink-0 text-graphite dark:text-graphite" />
           <input
             ref={inputRef}
             value={query}
             onChange={e => setQuery(e.target.value)}
             placeholder="Buscar o escribir un comando…"
-            className="flex-1 bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400 dark:text-slate-100 dark:placeholder:text-slate-600"
+            className="flex-1 bg-transparent text-sm text-night outline-none placeholder:text-graphite dark:text-stone-100 dark:placeholder:text-graphite"
           />
           {isFetching && (
-            <div className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-indigo-500 dark:border-slate-700 dark:border-t-indigo-400" />
+            <div className="h-4 w-4 animate-spin rounded-full border-2 border-stone border-t-signal dark:border-ink-body dark:border-t-signal" />
           )}
-          <kbd className="hidden rounded border border-slate-200 bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-500 sm:inline dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400">
+          <kbd className="hidden rounded border border-stone bg-stone-100 px-1.5 py-0.5 text-[10px] font-medium text-graphite sm:inline dark:border-ink-body dark:bg-night-700 dark:text-graphite">
             ESC
           </kbd>
         </div>
@@ -275,7 +283,7 @@ export function CommandPalette() {
         {/* Results */}
         <div ref={listRef} className="max-h-[420px] overflow-y-auto py-1">
           {allItems.length === 0 && (
-            <div className="flex flex-col items-center justify-center gap-1.5 py-10 text-slate-400 dark:text-slate-500">
+            <div className="flex flex-col items-center justify-center gap-1.5 py-10 text-graphite dark:text-graphite">
               <p className="text-sm">Sin resultados para <strong>"{query}"</strong></p>
             </div>
           )}
@@ -283,7 +291,7 @@ export function CommandPalette() {
           {Object.entries(groupedItems).map(([group, items]) => (
             <div key={group}>
               <div className="flex items-center gap-2 px-4 py-1.5">
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-graphite dark:text-graphite">
                   {group}
                 </span>
               </div>
@@ -302,36 +310,47 @@ export function CommandPalette() {
                     className={cn(
                       'flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors',
                       isSelected
-                        ? 'bg-indigo-50 dark:bg-indigo-950/50'
-                        : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'
+                        ? 'bg-night text-mist'
+                        : 'hover:bg-mist dark:hover:bg-night-700/50'
                     )}
                   >
                     <span className={cn(
                       'flex h-7 w-7 shrink-0 items-center justify-center rounded-lg',
                       isSelected
-                        ? 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900 dark:text-indigo-400'
-                        : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+                        ? 'bg-night-700 text-signal'
+                        : 'bg-stone-100 text-graphite dark:bg-night-700 dark:text-graphite'
                     )}>
                       {item.icon}
                     </span>
                     <span className="flex-1 min-w-0">
-                      <span className="block text-sm font-medium text-slate-800 dark:text-slate-100">
+                      <span className={cn(
+                        'block text-sm font-medium',
+                        isSelected ? 'text-mist' : 'text-night-700 dark:text-stone-100'
+                      )}>
                         {item.label}
                       </span>
                       {item.description && (
-                        <span className="block text-xs text-slate-400 truncate dark:text-slate-500">
+                        <span className={cn(
+                          'block text-xs truncate',
+                          isSelected ? 'text-[#9DB0BC]' : 'text-graphite dark:text-graphite'
+                        )}>
                           {item.description}
                         </span>
                       )}
                     </span>
                     <span className="flex items-center gap-1 shrink-0">
                       {item.shortcut && (
-                        <kbd className="rounded border border-slate-200 bg-slate-100 px-1.5 py-0.5 text-[10px] font-mono text-slate-400 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-500">
+                        <kbd className={cn(
+                          'rounded border px-1.5 py-0.5 text-[10px] font-mono',
+                          isSelected
+                            ? 'border-signal/30 bg-night-700 text-signal'
+                            : 'border-stone bg-stone-100 text-graphite dark:border-ink-body dark:bg-night-700 dark:text-graphite'
+                        )}>
                           {item.shortcut}
                         </kbd>
                       )}
                       {isSelected && (
-                        <ArrowRight className="h-3.5 w-3.5 text-indigo-400 dark:text-indigo-500" />
+                        <ArrowRight className="h-3.5 w-3.5 text-signal" />
                       )}
                     </span>
                   </button>
@@ -342,23 +361,23 @@ export function CommandPalette() {
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between border-t border-slate-100 px-4 py-2 dark:border-slate-800">
-          <div className="flex items-center gap-3 text-[11px] text-slate-400 dark:text-slate-500">
+        <div className="flex items-center justify-between border-t border-stone-100 px-4 py-2 dark:border-night-700">
+          <div className="flex items-center gap-3 text-[11px] text-graphite dark:text-graphite">
             <span className="flex items-center gap-1">
-              <kbd className="rounded border border-slate-200 bg-slate-100 px-1 dark:border-slate-700 dark:bg-slate-800">↑</kbd>
-              <kbd className="rounded border border-slate-200 bg-slate-100 px-1 dark:border-slate-700 dark:bg-slate-800">↓</kbd>
+              <kbd className="rounded border border-stone bg-stone-100 px-1 dark:border-ink-body dark:bg-night-700">↑</kbd>
+              <kbd className="rounded border border-stone bg-stone-100 px-1 dark:border-ink-body dark:bg-night-700">↓</kbd>
               navegar
             </span>
             <span className="flex items-center gap-1">
-              <kbd className="rounded border border-slate-200 bg-slate-100 px-1.5 dark:border-slate-700 dark:bg-slate-800">↵</kbd>
+              <kbd className="rounded border border-stone bg-stone-100 px-1.5 dark:border-ink-body dark:bg-night-700">↵</kbd>
               seleccionar
             </span>
             <span className="hidden sm:flex items-center gap-1">
-              <kbd className="rounded border border-slate-200 bg-slate-100 px-1.5 dark:border-slate-700 dark:bg-slate-800">G</kbd>+<kbd className="rounded border border-slate-200 bg-slate-100 px-1.5 dark:border-slate-700 dark:bg-slate-800">D/P/K/T</kbd>
+              <kbd className="rounded border border-stone bg-stone-100 px-1.5 dark:border-ink-body dark:bg-night-700">G</kbd>+<kbd className="rounded border border-stone bg-stone-100 px-1.5 dark:border-ink-body dark:bg-night-700">D/P/K/T</kbd>
               ir a
             </span>
           </div>
-          <span className="text-[11px] text-slate-300 dark:text-slate-600">Faro Command</span>
+          <span className="text-[11px] text-stone dark:text-graphite">Faro Command</span>
         </div>
       </div>
     </div>

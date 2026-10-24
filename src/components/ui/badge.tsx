@@ -2,18 +2,30 @@ import * as React from 'react'
 import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '@/lib/utils'
 
+/**
+ * Faro badge — pill-shaped state chip. Semantic variants match the brand
+ * status palette (success/danger/info/warning) and the neutral ones use
+ * Stone / Signal-wash / Noche for the four brand contexts.
+ *
+ * Sizing: 11px semibold with generous horizontal padding — reads as a status
+ * pill, not a button. Never use badges as clickable UI.
+ */
 const badgeVariants = cva(
-  'inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors',
+  'inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold transition-colors',
   {
     variants: {
       variant: {
-        default: 'bg-indigo-100 text-indigo-700',
-        secondary: 'bg-slate-100 text-slate-700',
-        success: 'bg-green-100 text-green-700',
-        warning: 'bg-yellow-100 text-yellow-700',
-        danger: 'bg-red-100 text-red-700',
-        orange: 'bg-orange-100 text-orange-700',
-        outline: 'border border-slate-200 text-slate-700',
+        // Default: quiet neutral on stone
+        default: 'bg-border-soft text-foreground',
+        secondary: 'bg-border-soft text-graphite',
+        // Semantic status pills
+        success: 'bg-success-wash text-success',
+        warning: 'bg-signal-wash text-signal-ink',
+        danger: 'bg-danger-wash text-danger',
+        orange: 'bg-signal-wash text-signal-ink',
+        // Noche pill for "completed" — the reverse-out treatment
+        night: 'bg-night text-mist',
+        outline: 'border border-border text-graphite bg-transparent',
       },
     },
     defaultVariants: { variant: 'default' },

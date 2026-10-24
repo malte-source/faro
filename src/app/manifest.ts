@@ -1,53 +1,115 @@
 import type { MetadataRoute } from 'next'
 
+/**
+ * PWA manifest.
+ *
+ * Bumping the `id` (`?pwa=v7`) forces Android/Chrome to treat the next install
+ * as a NEW PWA — only reliable way to refresh the OS-level icon cache and
+ * have new shortcuts / new artwork show up after a manifest change.
+ *
+ * v7 changes: brand overhaul — new lighthouse symbol (Noche + Señal), name
+ * cased "Faro" (was "FARO"), description in neutral Spanish, tagline "Luz
+ * sobre el proyecto." Icons bumped to ?v=10 to bust OS-level icon cache.
+ */
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    // 'id' is required for Chrome to use the modern WebAPK minting service,
-    // which generates APKs with current targetSdkVersion (avoids Play Protect warning).
-    id: '/',
+    id: '/?pwa=v7',
     name: 'Faro — Gestión de Proyectos',
     short_name: 'Faro',
-    description: 'Navigate your projects with clarity.',
+    description:
+      'Gestión de proyectos en español para equipos que trabajan con Google Workspace. Luz sobre el proyecto.',
     start_url: '/dashboard',
     scope: '/',
     display: 'standalone',
+    // Prefer Window-Controls-Overlay on desktop (Chrome/Edge) for more vertical
+    // space; fall back to standard standalone on Android/iOS.
+    display_override: ['window-controls-overlay', 'standalone', 'minimal-ui'],
     orientation: 'portrait',
-    background_color: '#0f172a',
-    theme_color: '#4f46e5',
+    // Faro brand — Noche background, Señal accent
+    background_color: '#0A1A26',
+    theme_color: '#0A1A26',
     categories: ['productivity', 'business'],
+    lang: 'es-AR',
+    dir: 'ltr',
     prefer_related_applications: false,
+    // Focus existing window instead of spawning duplicates when the user
+    // clicks an OS launcher / shortcut while FARO is already running.
+    launch_handler: { client_mode: ['focus-existing', 'auto'] },
+
     icons: [
-      // SVG must NOT have 'maskable' purpose — keep as 'any' only
-      {
-        src: '/icons/icon.svg',
-        sizes: 'any',
-        type: 'image/svg+xml',
-        purpose: 'any',
-      },
-      { src: '/icons/icon-72.png',  sizes: '72x72',   type: 'image/png', purpose: 'any' },
-      { src: '/icons/icon-96.png',  sizes: '96x96',   type: 'image/png', purpose: 'any' },
-      { src: '/icons/icon-128.png', sizes: '128x128', type: 'image/png', purpose: 'any' },
-      { src: '/icons/icon-144.png', sizes: '144x144', type: 'image/png', purpose: 'any' },
-      { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
-      { src: '/icons/icon-384.png', sizes: '384x384', type: 'image/png', purpose: 'any' },
-      { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
-      // Dedicated maskable entry (512px required for Play Protect compliance)
-      { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+      // SVG must NOT have 'maskable' purpose — keep as 'any' only.
+      { src: '/icons/icon.svg?v=10',           sizes: 'any',     type: 'image/svg+xml', purpose: 'any' },
+      { src: '/icons/icon-72.png?v=10',        sizes: '72x72',   type: 'image/png',     purpose: 'any' },
+      { src: '/icons/icon-96.png?v=10',        sizes: '96x96',   type: 'image/png',     purpose: 'any' },
+      { src: '/icons/icon-128.png?v=10',       sizes: '128x128', type: 'image/png',     purpose: 'any' },
+      { src: '/icons/icon-144.png?v=10',       sizes: '144x144', type: 'image/png',     purpose: 'any' },
+      { src: '/icons/icon-192.png?v=10',       sizes: '192x192', type: 'image/png',     purpose: 'any' },
+      { src: '/icons/icon-384.png?v=10',       sizes: '384x384', type: 'image/png',     purpose: 'any' },
+      { src: '/icons/icon-512.png?v=10',       sizes: '512x512', type: 'image/png',     purpose: 'any' },
+      // Maskable variants — circular logo on a solid navy square so the OS
+      // adaptive-icon mask (circle/squircle) never reveals white/grey corners.
+      { src: '/icons/icon-maskable-192.png?v=10', sizes: '192x192', type: 'image/png', purpose: 'maskable' },
+      { src: '/icons/icon-maskable-512.png?v=10', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
     ],
+
+    // App launcher shortcuts (long-press the icon on Android / right-click on
+    // desktop). The OS shows up to 4 — order them by daily-frequency. We
+    // surface Mi día + Semana + Mes + Tareas to make FARO compete with native
+    // calendar apps as the daily driver, given Sprint 3 added /week + /month.
     shortcuts: [
       {
-        name: 'Proyectos',
-        short_name: 'Proyectos',
-        description: 'Ver todos los proyectos',
-        url: '/dashboard/projects',
-        icons: [{ src: '/icons/icon-96.png', sizes: '96x96' }],
+        name: 'Mi día',
+        short_name: 'Mi día',
+        description: 'Lo que tengo que hacer hoy',
+        url: '/dashboard/today',
+        icons: [{ src: '/icons/icon-96.png?v=10', sizes: '96x96' }],
+      },
+      {
+        name: 'Semana',
+        short_name: 'Semana',
+        description: 'Distribución semanal de tus tareas',
+        url: '/dashboard/week',
+        icons: [{ src: '/icons/icon-96.png?v=10', sizes: '96x96' }],
+      },
+      {
+        name: 'Mes',
+        short_name: 'Mes',
+        description: 'Grilla mensual de tareas con fecha',
+        url: '/dashboard/month',
+        icons: [{ src: '/icons/icon-96.png?v=10', sizes: '96x96' }],
       },
       {
         name: 'Tareas',
         short_name: 'Tareas',
-        description: 'Ver mis tareas',
-        url: '/dashboard/tasks?view=mine',
-        icons: [{ src: '/icons/icon-96.png', sizes: '96x96' }],
+        description: 'Vista global de tareas',
+        url: '/dashboard/tasks',
+        icons: [{ src: '/icons/icon-96.png?v=10', sizes: '96x96' }],
+      },
+    ],
+
+    // Receive shared text / image / audio from other apps → opens FARO's
+    // Magic Quick Add so the user can convert the share into a task in one
+    // step.  Android shows FARO in the share sheet for matching MIME types.
+    share_target: {
+      action: '/dashboard/today',
+      method: 'GET',
+      params: {
+        title: 'title',
+        text: 'text',
+        url: 'url',
+      },
+    },
+
+    // Screenshots show in the Android install dialog (since Chrome 102) and
+    // make the prompt feel like a real app store listing.  Form factor 'wide'
+    // is for tablets/desktop, 'narrow' for phones.
+    screenshots: [
+      {
+        src: '/icons/icon-512.png?v=10',
+        sizes: '512x512',
+        type: 'image/png',
+        form_factor: 'narrow',
+        label: 'Faro — Dashboard',
       },
     ],
   }

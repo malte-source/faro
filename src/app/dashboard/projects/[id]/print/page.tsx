@@ -79,7 +79,7 @@ export default async function PrintPage({ params }: { params: Promise<{ id: stri
   }).format(new Date())
 
   return (
-    <div className="min-h-screen bg-white font-sans text-slate-900">
+    <div className="min-h-screen bg-surface font-sans text-foreground">
       <style>{`
         @media print {
           .print\\:hidden { display: none !important; }
@@ -93,7 +93,7 @@ export default async function PrintPage({ params }: { params: Promise<{ id: stri
         <PrintControls projectName={project.name} />
 
         {/* Report header */}
-        <div className="mb-8 border-b-2 border-slate-200 pb-6">
+        <div className="mb-8 border-b-2 border-border pb-6">
           <div className="flex items-start gap-4">
             <div
               className="mt-1 h-5 w-5 shrink-0 rounded-full"
@@ -101,8 +101,8 @@ export default async function PrintPage({ params }: { params: Promise<{ id: stri
             />
             <div className="flex-1">
               <div className="flex items-center gap-3 flex-wrap">
-                <span className="text-sm font-medium text-slate-400">{project.code}</span>
-                <h1 className="text-2xl font-bold text-slate-900">{project.name}</h1>
+                <span className="text-sm font-medium text-graphite">{project.code}</span>
+                <h1 className="text-2xl font-bold text-foreground">{project.name}</h1>
               </div>
               <div className="mt-2 flex flex-wrap items-center gap-3">
                 {statusInfo && (
@@ -129,7 +129,7 @@ export default async function PrintPage({ params }: { params: Promise<{ id: stri
                 {project.health_score != null && (
                   <span className={`text-sm font-semibold ${
                     project.health_score >= 70 ? 'text-green-600' :
-                    project.health_score >= 40 ? 'text-yellow-600' : 'text-red-500'
+                    project.health_score >= 40 ? 'text-yellow-600' : 'text-danger'
                   }`}>
                     ❤ Salud: {project.health_score}%
                   </span>
@@ -139,7 +139,7 @@ export default async function PrintPage({ params }: { params: Promise<{ id: stri
           </div>
 
           {project.description && (
-            <p className="mt-4 text-sm leading-relaxed text-slate-600 whitespace-pre-wrap">
+            <p className="mt-4 text-sm leading-relaxed text-graphite whitespace-pre-wrap">
               {project.description}
             </p>
           )}
@@ -158,22 +158,22 @@ export default async function PrintPage({ params }: { params: Promise<{ id: stri
                 : '—',
             },
           ].map(({ label, value }) => (
-            <div key={label} className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-              <p className="text-xs text-slate-500">{label}</p>
-              <p className="mt-0.5 text-lg font-bold text-slate-900">{value}</p>
+            <div key={label} className="rounded-xl border border-border bg-background px-4 py-3">
+              <p className="text-xs text-graphite">{label}</p>
+              <p className="mt-0.5 text-lg font-bold text-foreground">{value}</p>
             </div>
           ))}
         </div>
 
         {/* Progress bar */}
         <div className="mb-8">
-          <div className="mb-1.5 flex justify-between text-xs text-slate-500">
+          <div className="mb-1.5 flex justify-between text-xs text-graphite">
             <span>Progreso del proyecto</span>
             <span>{project.progress_pct}%</span>
           </div>
-          <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
+          <div className="h-2.5 w-full overflow-hidden rounded-full bg-border-soft">
             <div
-              className="h-full rounded-full bg-indigo-500"
+              className="h-full rounded-full bg-signal"
               style={{ width: `${project.progress_pct}%` }}
             />
           </div>
@@ -182,10 +182,10 @@ export default async function PrintPage({ params }: { params: Promise<{ id: stri
         {/* Tasks section */}
         <div className="mb-8">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-base font-bold text-slate-800">
-              Tareas <span className="ml-1 text-slate-400 font-normal">({totalTasks})</span>
+            <h2 className="text-base font-bold text-foreground">
+              Tareas <span className="ml-1 text-graphite font-normal">({totalTasks})</span>
             </h2>
-            <span className="text-sm text-slate-500">
+            <span className="text-sm text-graphite">
               {doneTasks} de {totalTasks} completadas
               {totalTasks > 0 && ` (${Math.round((doneTasks / totalTasks) * 100)}%)`}
             </span>
@@ -212,12 +212,12 @@ export default async function PrintPage({ params }: { params: Promise<{ id: stri
           {totalTasks > 0 && (
             <table className="w-full border-collapse text-sm">
               <thead>
-                <tr className="border-b-2 border-slate-200">
-                  <th className="py-2 text-left text-xs font-semibold text-slate-500">Tarea</th>
-                  <th className="py-2 text-left text-xs font-semibold text-slate-500">Estado</th>
-                  <th className="py-2 text-left text-xs font-semibold text-slate-500">Prioridad</th>
-                  <th className="py-2 text-left text-xs font-semibold text-slate-500">Asignado</th>
-                  <th className="py-2 text-left text-xs font-semibold text-slate-500">Vence</th>
+                <tr className="border-b-2 border-border">
+                  <th className="py-2 text-left text-xs font-semibold text-graphite">Tarea</th>
+                  <th className="py-2 text-left text-xs font-semibold text-graphite">Estado</th>
+                  <th className="py-2 text-left text-xs font-semibold text-graphite">Prioridad</th>
+                  <th className="py-2 text-left text-xs font-semibold text-graphite">Asignado</th>
+                  <th className="py-2 text-left text-xs font-semibold text-graphite">Vence</th>
                 </tr>
               </thead>
               <tbody>
@@ -225,9 +225,9 @@ export default async function PrintPage({ params }: { params: Promise<{ id: stri
                   const assignee = task.assignee as { id: string; name: string } | null
                   const p = PRIORITY[task.priority as keyof typeof PRIORITY]
                   return (
-                    <tr key={task.id} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
+                    <tr key={task.id} className={i % 2 === 0 ? 'bg-surface' : 'bg-background'}>
                       <td className="py-2 pr-4">
-                        <span className="font-medium text-slate-800">{task.title}</span>
+                        <span className="font-medium text-foreground">{task.title}</span>
                       </td>
                       <td className="py-2 pr-4">
                         <span
@@ -241,15 +241,15 @@ export default async function PrintPage({ params }: { params: Promise<{ id: stri
                         </span>
                       </td>
                       <td className="py-2 pr-4">
-                        <span className={`text-xs font-medium ${p?.color ?? 'text-slate-500'}`}>
+                        <span className={`text-xs font-medium ${p?.color ?? 'text-graphite'}`}>
                           {p?.label ?? task.priority}
                         </span>
                       </td>
                       <td className="py-2 pr-4">
-                        <span className="text-xs text-slate-600">{assignee?.name ?? '—'}</span>
+                        <span className="text-xs text-graphite">{assignee?.name ?? '—'}</span>
                       </td>
                       <td className="py-2">
-                        <span className="text-xs text-slate-600">
+                        <span className="text-xs text-graphite">
                           {task.due_date ? formatDate(task.due_date) : '—'}
                         </span>
                       </td>
@@ -264,18 +264,18 @@ export default async function PrintPage({ params }: { params: Promise<{ id: stri
         {/* Team members */}
         {(members?.length ?? 0) > 0 && (
           <div className="mb-8">
-            <h2 className="mb-4 text-base font-bold text-slate-800">
-              Equipo <span className="ml-1 text-slate-400 font-normal">({members!.length})</span>
+            <h2 className="mb-4 text-base font-bold text-foreground">
+              Equipo <span className="ml-1 text-graphite font-normal">({members!.length})</span>
             </h2>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               {members!.map(member => {
                 const user = member.user as { id: string; name: string; email: string; position: string | null } | null
                 const roleLabel = { lead: 'Líder', contributor: 'Colaborador', viewer: 'Observador' }[member.role] ?? member.role
                 return (
-                  <div key={member.id} className="rounded-lg border border-slate-200 px-3 py-2.5">
-                    <p className="text-sm font-semibold text-slate-800">{user?.name ?? '—'}</p>
-                    <p className="text-xs text-slate-500">{user?.position ?? roleLabel}</p>
-                    <p className="mt-0.5 text-[11px] text-slate-400">{roleLabel}</p>
+                  <div key={member.id} className="rounded-lg border border-border px-3 py-2.5">
+                    <p className="text-sm font-semibold text-foreground">{user?.name ?? '—'}</p>
+                    <p className="text-xs text-graphite">{user?.position ?? roleLabel}</p>
+                    <p className="mt-0.5 text-[11px] text-graphite">{roleLabel}</p>
                   </div>
                 )
               })}
@@ -284,8 +284,8 @@ export default async function PrintPage({ params }: { params: Promise<{ id: stri
         )}
 
         {/* Footer */}
-        <div className="border-t border-slate-200 pt-4 text-center text-xs text-slate-400">
-          Generado por <span className="font-semibold text-indigo-600">Faro</span> · {generatedAt}
+        <div className="border-t border-border pt-4 text-center text-xs text-graphite">
+          Generado por <span className="font-display font-semibold text-foreground">Faro</span> · {generatedAt}
           {me.name && ` · Por ${me.name}`}
         </div>
       </div>

@@ -19,16 +19,20 @@ import { CSS } from '@dnd-kit/utilities'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { AddTaskDialog } from './add-task-dialog'
 import { TaskDetailPanel } from './task-detail-panel'
-import { PRIORITY, formatDate, daysUntil } from '@/lib/utils'
-import { Plus, Calendar, AlertCircle, GripVertical } from 'lucide-react'
+import { PRIORITY } from '@/lib/utils'
+import { Plus, AlertCircle, GripVertical } from 'lucide-react'
 import type { TaskStatus } from '@/types/database'
+import { DueDateChip } from '@/components/ui/due-date-chip'
+import { BlockedChip } from '@/components/ui/blocked-chip'
+import { TaskActionsSheet } from '@/components/tasks/mobile-task-row'
+import { FilterChip } from './mobile-bits'
 
 const COLUMNS: { id: TaskStatus; label: string; accent: string; headerBg: string }[] = [
-  { id: 'todo',        label: 'Por hacer',   accent: 'bg-slate-300',  headerBg: 'bg-slate-50'  },
-  { id: 'in_progress', label: 'En progreso', accent: 'bg-blue-400',   headerBg: 'bg-blue-50'   },
-  { id: 'in_review',   label: 'En revisión', accent: 'bg-yellow-400', headerBg: 'bg-yellow-50' },
-  { id: 'done',        label: 'Listo',       accent: 'bg-emerald-400',headerBg: 'bg-emerald-50'},
-  { id: 'canceled',   label: 'Cancelado',   accent: 'bg-red-300',    headerBg: 'bg-red-50'    },
+  { id: 'todo',        label: 'Por hacer',   accent: 'bg-stone',  headerBg: 'bg-background'  },
+  { id: 'in_progress', label: 'En progreso', accent: 'bg-info',   headerBg: 'bg-info/10'   },
+  { id: 'in_review',   label: 'En revisión', accent: 'bg-yellow-400', headerBg: 'bg-signal-wash dark:bg-signal/10' },
+  { id: 'done',        label: 'Listo',       accent: 'bg-success',headerBg: 'bg-success-wash dark:bg-success/15'},
+  { id: 'canceled',   label: 'Cancelado',   accent: 'bg-danger/50',    headerBg: 'bg-danger-wash dark:bg-danger/15'    },
 ]
 
 /* ──────────────────────────── task card ──────────────────────────── */
@@ -40,20 +44,23 @@ interface TaskType {
   priority: string
   due_date: string | null
   assignee: { name: string; avatar_url: string | null } | null
+  blocking?: Array<{ id: string; depends_on: { id: string; title: string; status: string } | null }>
 }
 
 function TaskCardContent({ task }: { task: TaskType; listeners?: Record<string, unknown> }) {
   const priorityInfo = PRIORITY[task.priority as keyof typeof PRIORITY]
-  const days = task.due_date ? daysUntil(task.due_date) : null
-  const isOverdue = days !== null && days < 0 && task.status !== 'done' && task.status !== 'canceled'
+  const isDone = task.status === 'done' || task.status === 'canceled'
 
   return (
     <>
-      <p className="text-sm font-medium text-slate-800 leading-snug pr-1">{task.title}</p>
+      <p className="text-sm font-medium text-foreground leading-snug pr-8 md:pr-1 inline-flex items-center gap-1.5">
+        <span className="line-clamp-2">{task.title}</span>
+        <BlockedChip blocking={task.blocking} />
+      </p>
       <div className="mt-2.5 flex items-center justify-between">
         <div className="flex items-center gap-1.5">
-          <div className={`h-2 w-2 rounded-full ${priorityInfo?.dot ?? 'bg-slate-300'}`} />
-          <span className={`text-[11px] font-medium ${priorityInfo?.color ?? 'text-slate-500'}`}>
+          <div className={`h-2 w-2 rounded-full ${priorityInfo?.dot ?? 'bg-stone'}`} />
+          <span className={`text-[11px] font-medium ${priorityInfo?.color ?? 'text-graphite'}`}>
             {priorityInfo?.label}
           </span>
         </div>
@@ -67,9 +74,8 @@ function TaskCardContent({ task }: { task: TaskType; listeners?: Record<string, 
         )}
       </div>
       {task.due_date && (
-        <div className={`mt-1.5 flex items-center gap-1 text-[11px] ${isOverdue ? 'text-red-500 font-medium' : 'text-slate-400'}`}>
-          <Calendar className="h-3 w-3" />
-          {isOverdue ? `Vencida ${Math.abs(days!)}d` : formatDate(task.due_date)}
+        <div className="mt-1.5">
+          <DueDateChip date={task.due_date} isDone={isDone} variant="text" />
         </div>
       )}
     </>
@@ -77,7 +83,7 @@ function TaskCardContent({ task }: { task: TaskType; listeners?: Record<string, 
 }
 
 /* Draggable wrapper */
-function DraggableCard({ task, onClick }: { task: TaskType; onClick: () => void }) {
+function DraggableCard({ task, onClick, onMove }: { task: TaskType; onClick: () => void; onMove: () => void }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: task.id,
     data: { status: task.status },
@@ -93,13 +99,13 @@ function DraggableCard({ task, onClick }: { task: TaskType; onClick: () => void 
     <div
       ref={setNodeRef}
       style={style}
-      className="group relative rounded-lg border border-slate-200 bg-white p-3 shadow-sm hover:shadow-md hover:border-slate-300 transition-all cursor-pointer"
+      className="group relative rounded-lg border border-border bg-surface p-3 shadow-sm hover:shadow-md hover:border-border transition-all cursor-pointer"
     >
       {/* Drag handle */}
       <button
         {...listeners}
         {...attributes}
-        className="absolute right-2 top-2.5 cursor-grab active:cursor-grabbing text-slate-200 hover:text-slate-400 transition-colors opacity-0 group-hover:opacity-100"
+        className="absolute right-1 top-1 flex h-9 w-9 touch-none cursor-grab items-center justify-center text-graphite/70 transition-colors active:cursor-grabbing md:right-2 md:top-2.5 md:h-auto md:w-auto md:text-stone md:hover:text-graphite opacity-100 md:opacity-0 md:group-hover:opacity-100"
         onClick={e => e.stopPropagation()}
         title="Arrastrar"
       >
@@ -110,6 +116,14 @@ function DraggableCard({ task, onClick }: { task: TaskType; onClick: () => void 
       <div onClick={onClick}>
         <TaskCardContent task={task} />
       </div>
+      {/* Phones: moving between columns without a long-press drag */}
+      <button
+        type="button"
+        onClick={e => { e.stopPropagation(); onMove() }}
+        className="mt-2.5 inline-flex h-8 items-center rounded-full bg-border-soft px-3 text-xs font-medium text-graphite active:bg-border md:hidden"
+      >
+        Mover a… ›
+      </button>
     </div>
   )
 }
@@ -117,7 +131,7 @@ function DraggableCard({ task, onClick }: { task: TaskType; onClick: () => void 
 /* Overlay card rendered by DragOverlay */
 function OverlayCard({ task }: { task: TaskType }) {
   return (
-    <div className="w-64 rounded-lg border border-indigo-300 bg-white p-3 shadow-xl ring-2 ring-indigo-400/30 rotate-2 scale-105">
+    <div className="w-64 rounded-lg border border-signal/40 bg-surface p-3 shadow-xl ring-2 ring-signal/30 rotate-2 scale-105">
       <TaskCardContent task={task} />
     </div>
   )
@@ -131,35 +145,39 @@ function DroppableColumn({
   isLoading,
   onAdd,
   onCardClick,
+  onMove,
 }: {
   col: typeof COLUMNS[number]
   tasks: TaskType[]
   isLoading: boolean
   onAdd: (status: TaskStatus) => void
   onCardClick: (taskId: string) => void
+  onMove: (taskId: string) => void
 }) {
   const { isOver, setNodeRef } = useDroppable({ id: col.id })
 
   return (
     <div
       ref={setNodeRef}
-      className={`flex w-64 shrink-0 flex-col rounded-xl border transition-all duration-150 ${
-        isOver ? 'border-indigo-400 bg-indigo-50/40 shadow-md' : 'border-slate-200 bg-slate-50'
+      id={`col-${col.id}`}
+      className={`flex w-[80vw] max-w-[320px] shrink-0 snap-center flex-col rounded-xl border transition-all duration-150 md:w-64 md:max-w-none ${
+        isOver ? 'border-signal/50 bg-signal-wash/40 shadow-md' : 'border-border bg-background'
       }`}
     >
       {/* Header */}
-      <div className={`flex items-center justify-between rounded-t-xl px-3 py-2.5 border-b ${isOver ? 'border-indigo-200 bg-indigo-50' : 'border-slate-200 ' + col.headerBg}`}>
+      <div className={`flex items-center justify-between rounded-t-xl px-3 py-2.5 border-b ${isOver ? 'border-border bg-signal-wash' : 'border-border ' + col.headerBg}`}>
         <div className="flex items-center gap-2">
           <div className={`h-2 w-2 rounded-full ${col.accent}`} />
-          <span className="text-xs font-semibold text-slate-700">{col.label}</span>
-          <span className="rounded-full bg-slate-200 px-1.5 py-0.5 text-[10px] font-medium text-slate-500 tabular-nums">
+          <span className="text-xs font-semibold text-body">{col.label}</span>
+          <span className="rounded-full bg-border-soft px-1.5 py-0.5 text-[10px] font-medium text-graphite tabular-nums">
             {isLoading ? '…' : tasks.length}
           </span>
         </div>
         <button
           onClick={() => onAdd(col.id)}
-          className="rounded p-0.5 text-slate-400 hover:bg-white/60 hover:text-slate-700 transition-colors"
+          className="flex h-9 w-9 items-center justify-center rounded-full p-0.5 text-graphite transition-colors hover:bg-surface/60 hover:text-body active:bg-surface md:h-auto md:w-auto md:rounded"
           title="Agregar tarea"
+          aria-label={`Agregar tarea a ${col.label}`}
         >
           <Plus className="h-3.5 w-3.5" />
         </button>
@@ -170,22 +188,22 @@ function DroppableColumn({
         {isLoading ? (
           // Skeleton
           [...Array(col.id === 'todo' ? 3 : col.id === 'in_progress' ? 2 : 1)].map((_, i) => (
-            <div key={i} className="h-20 rounded-lg bg-white border border-slate-100 animate-pulse" />
+            <div key={i} className="h-20 rounded-lg bg-surface border border-border-soft animate-pulse" />
           ))
         ) : tasks.length === 0 ? (
           <div
-            className={`flex flex-col items-center justify-center rounded-lg border border-dashed py-6 text-slate-400 transition-colors ${
-              isOver ? 'border-indigo-300 bg-indigo-50 text-indigo-400' : 'border-slate-200 hover:border-slate-300 hover:bg-white hover:text-slate-500'
+            className={`flex flex-col items-center justify-center rounded-lg border border-dashed py-6 text-graphite transition-colors ${
+              isOver ? 'border-signal/40 bg-signal-wash text-signal-ink' : 'border-border hover:border-border hover:bg-surface hover:text-graphite'
             }`}
           >
             {isOver ? (
-              <span className="text-xs font-medium text-indigo-500">Soltar aquí</span>
+              <span className="text-xs font-medium text-signal-ink">Soltar aquí</span>
             ) : (
               <>
                 <Plus className="h-4 w-4" />
                 <button
                   onClick={() => onAdd(col.id)}
-                  className="mt-1 text-[11px] hover:text-slate-700 transition-colors"
+                  className="mt-1 py-1.5 text-xs hover:text-body transition-colors md:py-0 md:text-[11px]"
                 >
                   Agregar tarea
                 </button>
@@ -198,6 +216,7 @@ function DroppableColumn({
               key={task.id}
               task={task}
               onClick={() => onCardClick(task.id)}
+              onMove={() => onMove(task.id)}
             />
           ))
         )}
@@ -215,6 +234,7 @@ export function TaskBoard({ projectId }: Props) {
   const [addStatus, setAddStatus] = useState<TaskStatus>('todo')
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
   const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null)
+  const [moveTaskId, setMoveTaskId] = useState<string | null>(null)
 
   const { data: tasks, isLoading, error } = trpc.tasks.byProject.useQuery(projectId)
   const utils = trpc.useUtils()
@@ -231,7 +251,7 @@ export function TaskBoard({ projectId }: Props) {
     onError: (_, __, ctx) => {
       if (ctx?.prev) utils.tasks.byProject.setData(projectId, ctx.prev)
     },
-    onSettled: () => utils.tasks.byProject.invalidate(projectId),
+    onSettled: () => void Promise.all([utils.tasks.invalidate(), utils.projects.invalidate()]),
   })
 
   const sensors = useSensors(
@@ -262,7 +282,7 @@ export function TaskBoard({ projectId }: Props) {
 
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 text-slate-400">
+      <div className="flex flex-col items-center justify-center py-16 text-graphite">
         <AlertCircle className="mb-2 h-6 w-6" />
         <p className="text-sm">Error al cargar el tablero</p>
       </div>
@@ -271,14 +291,28 @@ export function TaskBoard({ projectId }: Props) {
 
   return (
     <>
+      {/* Phones: jump between columns */}
+      <div className="-mx-4 mb-3 flex gap-2 overflow-x-auto px-4 [scrollbar-width:none] md:hidden [&::-webkit-scrollbar]:hidden" data-no-track data-no-ptr>
+        {COLUMNS.map(col => (
+          <FilterChip
+            key={col.id}
+            onClick={() => document.getElementById(`col-${col.id}`)?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })}
+            count={(tasks ?? []).filter(t => t.status === col.id).length}
+          >
+            <span className={`h-2 w-2 rounded-full ${col.accent}`} />
+            {col.label}
+          </FilterChip>
+        ))}
+      </div>
+
       <DndContext
         sensors={sensors}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
       >
-        <div className="flex gap-3 overflow-x-auto pb-4">
+        <div className="-mx-4 flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4 pb-4 md:mx-0 md:snap-none md:px-0" data-no-track data-no-ptr>
           {COLUMNS.map(col => {
-            const colTasks = (tasks ?? []).filter(t => t.status === col.id) as TaskType[]
+            const colTasks = (tasks ?? []).filter(t => t.status === col.id) as unknown as TaskType[]
             return (
               <DroppableColumn
                 key={col.id}
@@ -287,6 +321,7 @@ export function TaskBoard({ projectId }: Props) {
                 isLoading={isLoading}
                 onAdd={(status) => { setAddStatus(status); setAddOpen(true) }}
                 onCardClick={setSelectedTaskId}
+                onMove={setMoveTaskId}
               />
             )
           })}
@@ -294,7 +329,7 @@ export function TaskBoard({ projectId }: Props) {
 
         {/* Ghost card during drag */}
         <DragOverlay dropAnimation={{ duration: 150, easing: 'ease' }}>
-          {activeTask && <OverlayCard task={activeTask as TaskType} />}
+          {activeTask && <OverlayCard task={activeTask as unknown as TaskType} />}
         </DragOverlay>
       </DndContext>
 
@@ -303,6 +338,14 @@ export function TaskBoard({ projectId }: Props) {
         onOpenChange={setAddOpen}
         projectId={projectId}
         defaultStatus={addStatus}
+      />
+
+      <TaskActionsSheet
+        open={!!moveTaskId}
+        onClose={() => setMoveTaskId(null)}
+        title="Mover a…"
+        status={tasks?.find(t => t.id === moveTaskId)?.status}
+        onStatus={st => moveTaskId && updateTask.mutate({ id: moveTaskId, status: st })}
       />
 
       <TaskDetailPanel

@@ -1,21 +1,38 @@
 import { auth, signIn } from '@/lib/auth'
 import { redirect } from 'next/navigation'
+import { FaroMark } from '@/components/brand/logo'
 
 export default async function LoginPage() {
   const session = await auth()
   if (session) redirect('/dashboard')
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900">
-      <div className="w-full max-w-md px-8 py-10 bg-white/5 backdrop-blur border border-white/10 rounded-2xl shadow-2xl">
+    // Flat Noche — no gradient. Gradients are explicitly out of brand
+    // (Manual de Marca Faro §Login).
+    <div className="min-h-screen flex items-center justify-center bg-[#0A1A26] relative overflow-hidden">
+      {/* Bottom Google-color ribbon — the one place non-brand color is
+          required (Google's own brand colors on the sign-in affordance). */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-24 opacity-90"
+        style={{
+          background:
+            'linear-gradient(90deg, #4285F4 0%, #34A853 33%, #FBBC05 66%, #EA4335 100%)',
+          clipPath: 'polygon(0 60%, 100% 30%, 100% 100%, 0 100%)',
+        }}
+      />
+
+      <div className="relative w-full max-w-md px-8 py-10 bg-white/[0.06] border border-[#FFB020]/20 rounded-[18px]">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-indigo-500 mb-4">
-            <svg viewBox="0 0 24 24" className="w-8 h-8 text-white fill-current">
-              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="white" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
+          <div className="inline-flex items-center justify-center mb-5">
+            <FaroMark plain size={48} />
           </div>
-          <h1 className="text-3xl font-bold text-white tracking-tight">Faro</h1>
-          <p className="text-slate-400 mt-2 text-sm">Navigate your projects with clarity.</p>
+          <h1 className="font-display text-[30px] font-extrabold tracking-[-0.035em] text-[#F7F4EF]">
+            Faro
+          </h1>
+          <p className="text-[#9DB0BC] mt-2 text-[14px]">
+            Tus proyectos, con luz propia.
+          </p>
         </div>
 
         <form
@@ -26,7 +43,7 @@ export default async function LoginPage() {
         >
           <button
             type="submit"
-            className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-white text-slate-800 rounded-xl font-medium hover:bg-slate-50 transition-colors shadow"
+            className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-[#F7F4EF] text-[#0A1A26] rounded-xl font-semibold hover:bg-surface transition-colors"
           >
             <svg viewBox="0 0 24 24" className="w-5 h-5">
               <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
@@ -38,8 +55,8 @@ export default async function LoginPage() {
           </button>
         </form>
 
-        <p className="text-center text-slate-500 text-xs mt-6">
-          Al continuar, aceptás los Términos de Servicio y la Política de Privacidad de Faro.
+        <p className="text-center text-[11px] text-[#6E8290] mt-6">
+          Al continuar aceptas los Términos y la Política de Privacidad de Faro.
         </p>
       </div>
     </div>

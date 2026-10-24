@@ -16,20 +16,20 @@ import {
 /* ── colour maps ─────────────────────────────────────────────── */
 
 const STATUS_COLORS: Record<string, string> = {
-  todo: '#94a3b8', in_progress: '#3b82f6', in_review: '#f59e0b',
-  done: '#10b981', canceled: '#ef4444',
+  todo: '#55636B', in_progress: '#FFB020', in_review: '#2E6F9E',
+  done: '#17876A', canceled: '#C8453A',
 }
 const PRIORITY_COLORS: Record<string, string> = {
-  very_high: '#ef4444', high: '#f97316', medium: '#f59e0b',
-  low: '#22c55e', very_low: '#94a3b8',
+  very_high: '#C8453A', high: '#C67A08', medium: '#FFB020',
+  low: '#55636B', very_low: '#8B99A2',
 }
 const PRIORITY_LABELS: Record<string, string> = {
   very_high: 'Muy alta', high: 'Alta', medium: 'Media',
   low: 'Baja', very_low: 'Muy baja',
 }
 const PROJECT_STATUS_COLORS: Record<string, string> = {
-  not_started: '#94a3b8', in_progress: '#3b82f6', on_hold: '#f59e0b',
-  delayed: '#f97316', completed: '#10b981', canceled: '#ef4444', pending: '#8b5cf6',
+  not_started: '#55636B', in_progress: '#FFB020', on_hold: '#C67A08',
+  delayed: '#C8453A', completed: '#17876A', canceled: '#8B99A2', pending: '#7E6BB8',
 }
 const PROJECT_STATUS_LABELS: Record<string, string> = {
   not_started: 'Sin iniciar', in_progress: 'En progreso', on_hold: 'En pausa',
@@ -43,10 +43,10 @@ function SimpleTooltip({ active, payload, label, unit = '' }: {
 }) {
   if (!active || !payload?.length) return null
   return (
-    <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-md text-xs">
-      {label && <p className="font-medium text-slate-700 mb-1">{label}</p>}
+    <div className="rounded-xl bg-night px-3 py-2 text-xs">
+      {label && <p className="font-medium text-mist mb-1">{label}</p>}
       {payload.map((p, i) => (
-        <p key={i} className="text-slate-500">{p.name ?? ''} {p.value}{unit}</p>
+        <p key={i} className="text-[#9DB0BC]">{p.name ?? ''} {p.value}{unit}</p>
       ))}
     </div>
   )
@@ -59,18 +59,18 @@ function StatCard({ label, value, sub, icon: Icon, color = 'indigo' }: {
   icon: React.ElementType; color?: 'indigo' | 'emerald' | 'amber' | 'red' | 'blue' | 'purple'
 }) {
   const bg: Record<string, string> = {
-    indigo: 'bg-indigo-50 text-indigo-600', emerald: 'bg-emerald-50 text-emerald-600',
-    amber: 'bg-amber-50 text-amber-600', red: 'bg-red-50 text-red-600',
-    blue: 'bg-blue-50 text-blue-600', purple: 'bg-purple-50 text-purple-600',
+    indigo: 'bg-signal-wash text-signal-ink', emerald: 'bg-success-wash text-success',
+    amber: 'bg-signal-wash text-signal-ink', red: 'bg-danger-wash text-danger',
+    blue: 'bg-info/10 text-info', purple: 'bg-[#7E6BB8]/10 text-[#7E6BB8]',
   }
   return (
     <Card>
-      <CardContent className="pt-5">
+      <CardContent className="p-4 pt-4 md:p-6 md:pt-5">
         <div className="flex items-start justify-between">
           <div>
-            <p className="text-xs font-medium text-slate-500">{label}</p>
-            <p className="mt-1 text-2xl font-bold text-slate-900 tabular-nums">{value}</p>
-            {sub && <p className="mt-0.5 text-xs text-slate-400">{sub}</p>}
+            <p className="text-xs font-medium text-graphite">{label}</p>
+            <p className="mt-1 text-2xl font-bold text-foreground tabular-nums">{value}</p>
+            {sub && <p className="mt-0.5 text-xs text-graphite">{sub}</p>}
           </div>
           <div className={`flex h-9 w-9 items-center justify-center rounded-xl ${bg[color]}`}>
             <Icon className="h-4 w-4" />
@@ -140,10 +140,10 @@ export function ReportsOverview() {
 
     // Project health distribution
     const healthBuckets = [
-      { name: 'Crítico (0-39)', value: projects.filter(p => (p.health_score ?? 0) < 40 && p.status !== 'canceled').length, fill: '#ef4444' },
-      { name: 'En riesgo (40-69)', value: projects.filter(p => { const s = p.health_score ?? 0; return s >= 40 && s < 70 && p.status !== 'canceled' }).length, fill: '#f59e0b' },
-      { name: 'Saludable (70+)', value: projects.filter(p => (p.health_score ?? 0) >= 70 && p.status !== 'canceled').length, fill: '#10b981' },
-      { name: 'Sin datos', value: projects.filter(p => p.health_score == null && p.status !== 'canceled').length, fill: '#cbd5e1' },
+      { name: 'Crítico (0-39)', value: projects.filter(p => (p.health_score ?? 0) < 40 && p.status !== 'canceled').length, fill: '#C8453A' },
+      { name: 'En riesgo (40-69)', value: projects.filter(p => { const s = p.health_score ?? 0; return s >= 40 && s < 70 && p.status !== 'canceled' }).length, fill: '#FFB020' },
+      { name: 'Saludable (70+)', value: projects.filter(p => (p.health_score ?? 0) >= 70 && p.status !== 'canceled').length, fill: '#17876A' },
+      { name: 'Sin datos', value: projects.filter(p => p.health_score == null && p.status !== 'canceled').length, fill: '#8B99A2' },
     ].filter(d => d.value > 0)
 
     return {
@@ -173,7 +173,7 @@ export function ReportsOverview() {
   return (
     <div className="space-y-6">
       {/* KPI row */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard
           label="Tareas completadas"
           value={`${metrics.doneTasks} / ${metrics.totalTasks}`}
@@ -208,14 +208,14 @@ export function ReportsOverview() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {/* Tasks by priority */}
         <Card>
-          <CardHeader className="pb-2">
+          <CardHeader className="p-4 pb-2 md:p-6 md:pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
-              <Target className="h-4 w-4 text-slate-400" /> Tareas por prioridad
+              <Target className="h-4 w-4 text-graphite" /> Tareas por prioridad
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-4 pt-0 md:p-6 md:pt-0">
             {metrics.byPriority.length === 0 ? (
-              <p className="py-8 text-center text-sm text-slate-400">Sin datos</p>
+              <p className="py-8 text-center text-sm text-graphite">Sin datos</p>
             ) : (
               <ResponsiveContainer width="100%" height={180}>
                 <PieChart>
@@ -232,9 +232,9 @@ export function ReportsOverview() {
                 <div key={d.name} className="flex items-center justify-between text-xs">
                   <div className="flex items-center gap-1.5">
                     <div className="h-2 w-2 rounded-full" style={{ backgroundColor: d.fill }} />
-                    <span className="text-slate-600">{d.name}</span>
+                    <span className="text-graphite">{d.name}</span>
                   </div>
-                  <span className="tabular-nums font-medium text-slate-700">{d.value}</span>
+                  <span className="tabular-nums font-medium text-body">{d.value}</span>
                 </div>
               ))}
             </div>
@@ -243,19 +243,19 @@ export function ReportsOverview() {
 
         {/* Projects by status */}
         <Card>
-          <CardHeader className="pb-2">
+          <CardHeader className="p-4 pb-2 md:p-6 md:pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
-              <Activity className="h-4 w-4 text-slate-400" /> Proyectos por estado
+              <Activity className="h-4 w-4 text-graphite" /> Proyectos por estado
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-4 pt-0 md:p-6 md:pt-0">
             {metrics.projectsByStatus.length === 0 ? (
-              <p className="py-8 text-center text-sm text-slate-400">Sin datos</p>
+              <p className="py-8 text-center text-sm text-graphite">Sin datos</p>
             ) : (
               <ResponsiveContainer width="100%" height={180}>
                 <BarChart data={metrics.projectsByStatus} margin={{ top: 4, right: 4, left: -24, bottom: 0 }} barSize={18}>
-                  <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#94a3b8' }} tickLine={false} axisLine={false} />
-                  <YAxis tick={{ fontSize: 9, fill: '#94a3b8' }} tickLine={false} axisLine={false} allowDecimals={false} />
+                  <XAxis dataKey="name" tick={{ fontSize: 9, fill: 'var(--graphite)' }} tickLine={false} axisLine={false} />
+                  <YAxis tick={{ fontSize: 9, fill: 'var(--graphite)' }} tickLine={false} axisLine={false} allowDecimals={false} />
                   <Tooltip content={<SimpleTooltip unit=" proyectos" />} />
                   <Bar dataKey="value" radius={[4, 4, 0, 0]}>
                     {metrics.projectsByStatus.map((e, i) => <Cell key={i} fill={e.fill} />)}
@@ -268,14 +268,14 @@ export function ReportsOverview() {
 
         {/* Project health */}
         <Card>
-          <CardHeader className="pb-2">
+          <CardHeader className="p-4 pb-2 md:p-6 md:pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-slate-400" /> Salud de proyectos
+              <TrendingUp className="h-4 w-4 text-graphite" /> Salud de proyectos
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-4 pt-0 md:p-6 md:pt-0">
             {metrics.healthBuckets.length === 0 ? (
-              <p className="py-8 text-center text-sm text-slate-400">Sin datos</p>
+              <p className="py-8 text-center text-sm text-graphite">Sin datos</p>
             ) : (
               <ResponsiveContainer width="100%" height={180}>
                 <PieChart>
@@ -292,9 +292,9 @@ export function ReportsOverview() {
                 <div key={d.name} className="flex items-center justify-between text-xs">
                   <div className="flex items-center gap-1.5">
                     <div className="h-2 w-2 rounded-full" style={{ backgroundColor: d.fill }} />
-                    <span className="text-slate-600">{d.name}</span>
+                    <span className="text-graphite">{d.name}</span>
                   </div>
-                  <span className="tabular-nums font-medium text-slate-700">{d.value}</span>
+                  <span className="tabular-nums font-medium text-body">{d.value}</span>
                 </div>
               ))}
             </div>
@@ -305,24 +305,24 @@ export function ReportsOverview() {
       {/* Team workload chart */}
       {metrics.topAssignees.length > 0 && (
         <Card>
-          <CardHeader className="pb-2">
+          <CardHeader className="p-4 pb-2 md:p-6 md:pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
-              <Users className="h-4 w-4 text-slate-400" /> Carga de tareas por persona
+              <Users className="h-4 w-4 text-graphite" /> Carga de tareas por persona
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-4 pt-0 md:p-6 md:pt-0">
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={metrics.topAssignees} margin={{ top: 4, right: 4, left: -16, bottom: 0 }} barSize={20} barGap={2}>
-                <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#94a3b8' }} tickLine={false} axisLine={false} />
-                <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} tickLine={false} axisLine={false} allowDecimals={false} />
+                <XAxis dataKey="name" tick={{ fontSize: 10, fill: 'var(--graphite)' }} tickLine={false} axisLine={false} />
+                <YAxis tick={{ fontSize: 10, fill: 'var(--graphite)' }} tickLine={false} axisLine={false} allowDecimals={false} />
                 <Tooltip content={<SimpleTooltip />} />
                 <Legend
                   iconType="circle"
                   iconSize={8}
-                  formatter={(v) => <span style={{ fontSize: 11, color: '#64748b' }}>{v}</span>}
+                  formatter={(v) => <span style={{ fontSize: 11, color: 'var(--graphite)' }}>{v}</span>}
                 />
-                <Bar dataKey="total" name="Total" fill="#e0e7ff" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="done" name="Completadas" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="total" name="Total" fill="var(--border-soft)" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="done" name="Completadas" fill="#FFB020" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>

@@ -45,10 +45,10 @@ function ProjectCard({ project, isDragging }: { project: Project; isDragging?: b
 
   return (
     <div
-      className={`rounded-lg border bg-white p-3 shadow-sm transition-all dark:bg-slate-800 ${
+      className={`rounded-lg border bg-white p-3 shadow-sm transition-all dark:bg-night-700 ${
         isDragging
-          ? 'border-indigo-300 shadow-lg ring-2 ring-indigo-400/30 opacity-50 dark:border-indigo-600'
-          : 'border-slate-200 hover:shadow-md dark:border-slate-700'
+          ? 'border-signal/40 shadow-lg ring-2 ring-signal/30 opacity-50 dark:border-signal'
+          : 'border-stone hover:shadow-md dark:border-ink-body'
       }`}
     >
       <Link href={`/dashboard/projects/${project.id}`} className="block" onClick={e => isDragging && e.preventDefault()}>
@@ -58,8 +58,8 @@ function ProjectCard({ project, isDragging }: { project: Project; isDragging?: b
             style={{ backgroundColor: project.color }}
           />
           <div className="flex-1 min-w-0">
-            <span className="text-[10px] font-mono text-slate-400 block dark:text-slate-500">{project.code}</span>
-            <p className="text-sm font-semibold text-slate-800 leading-snug line-clamp-2 dark:text-slate-100">{project.name}</p>
+            <span className="text-[10px] font-mono text-graphite block dark:text-graphite">{project.code}</span>
+            <p className="text-sm font-semibold text-night-700 leading-snug line-clamp-2 dark:text-stone-100">{project.name}</p>
           </div>
         </div>
 
@@ -74,21 +74,21 @@ function ProjectCard({ project, isDragging }: { project: Project; isDragging?: b
 
         {/* Progress */}
         <div className="mb-2">
-          <div className="flex justify-between text-[10px] text-slate-400 mb-1 dark:text-slate-500">
+          <div className="flex justify-between text-[10px] text-graphite mb-1 dark:text-graphite">
             <span>Progreso</span>
             <span>{project.progress_pct}%</span>
           </div>
-          <div className="h-1 w-full rounded-full bg-slate-100 overflow-hidden dark:bg-slate-700">
+          <div className="h-1 w-full rounded-full bg-stone-100 overflow-hidden dark:bg-ink-body">
             <div
-              className="h-full rounded-full bg-indigo-500"
+              className="h-full rounded-full bg-signal"
               style={{ width: `${project.progress_pct}%` }}
             />
           </div>
         </div>
 
-        <div className="flex items-center justify-between text-[10px] text-slate-400 dark:text-slate-500">
+        <div className="flex items-center justify-between text-[10px] text-graphite dark:text-graphite">
           {project.end_date && (
-            <span className={`flex items-center gap-1 ${isOverdue ? 'text-red-500 font-medium' : ''}`}>
+            <span className={`flex items-center gap-1 ${isOverdue ? 'text-danger font-medium' : ''}`}>
               <Calendar className="h-3 w-3" />
               {isOverdue ? `${Math.abs(days!)}d vencido` : `${days}d`}
             </span>
@@ -115,7 +115,8 @@ function DraggableCard({ project }: { project: Project }) {
   const style: React.CSSProperties = {
     transform: CSS.Translate.toString(transform),
     cursor: isDragging ? 'grabbing' : 'grab',
-    touchAction: 'none',
+    // 'none' would block scrolling the board/page with a finger on a card; the TouchSensor's 200ms long-press starts the drag.
+    touchAction: 'manipulation',
   }
 
   return (
@@ -140,15 +141,15 @@ function DroppableColumn({
   return (
     <div
       ref={setNodeRef}
-      className={`flex w-64 shrink-0 flex-col rounded-xl border transition-colors ${
+      className={`flex w-[80vw] max-w-[320px] shrink-0 snap-center flex-col rounded-xl border transition-colors md:w-64 md:max-w-none ${
         isOver
-          ? 'border-indigo-400 bg-indigo-50/60 dark:border-indigo-600 dark:bg-indigo-950/30'
-          : 'border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800/40'
+          ? 'border-signal/50 bg-signal-wash/60 dark:border-signal dark:bg-signal/30'
+          : 'border-stone bg-mist dark:border-ink-body dark:bg-night-700/40'
       }`}
     >
-      <div className="flex items-center gap-2 border-b border-slate-200 px-3 py-2.5 dark:border-slate-700">
-        <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">{stage.label}</span>
-        <span className="rounded-full bg-slate-200 px-1.5 py-0.5 text-[10px] font-medium text-slate-600 dark:bg-slate-700 dark:text-slate-400">
+      <div className="flex items-center gap-2 border-b border-stone px-3 py-2.5 dark:border-ink-body">
+        <span className="text-xs font-semibold text-ink-body dark:text-stone">{stage.label}</span>
+        <span className="rounded-full bg-stone px-1.5 py-0.5 text-[10px] font-medium text-graphite dark:bg-ink-body dark:text-graphite">
           {projects.length}
         </span>
       </div>
@@ -159,12 +160,12 @@ function DroppableColumn({
         ))}
 
         {projects.length === 0 && !isOver && (
-          <p className="py-6 text-center text-xs text-slate-300 dark:text-slate-600">
+          <p className="py-6 text-center text-xs text-stone dark:text-graphite">
             Sin proyectos
           </p>
         )}
         {isOver && projects.length === 0 && (
-          <div className="flex-1 rounded-lg border-2 border-dashed border-indigo-300 dark:border-indigo-700" />
+          <div className="flex-1 rounded-lg border-2 border-dashed border-signal/40 dark:border-signal/60" />
         )}
       </div>
     </div>
@@ -227,10 +228,10 @@ export function ProjectKanban() {
     return (
       <div className="flex gap-3 overflow-x-auto pb-4">
         {KANBAN_STAGES.map(s => (
-          <div key={s.id} className="w-64 shrink-0 rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2 dark:border-slate-700 dark:bg-slate-800/40">
-            <div className="h-4 w-28 rounded bg-slate-100 animate-pulse dark:bg-slate-700" />
+          <div key={s.id} className="w-64 shrink-0 rounded-xl border border-stone bg-mist p-3 space-y-2 dark:border-ink-body dark:bg-night-700/40">
+            <div className="h-4 w-28 rounded bg-stone-100 animate-pulse dark:bg-ink-body" />
             {[...Array(2)].map((_, i) => (
-              <div key={i} className="h-24 rounded-lg bg-slate-100 animate-pulse dark:bg-slate-700" />
+              <div key={i} className="h-24 rounded-lg bg-stone-100 animate-pulse dark:bg-ink-body" />
             ))}
           </div>
         ))}
@@ -245,7 +246,7 @@ export function ProjectKanban() {
       onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
     >
-      <div className="flex gap-3 overflow-x-auto pb-4">
+      <div className="-mx-4 flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4 pb-4 md:mx-0 md:snap-none md:px-0" data-no-track data-no-ptr>
         {KANBAN_STAGES.map(stage => {
           const stageProjects = projects?.filter(p => p.kanban_stage === stage.id) ?? []
           return (

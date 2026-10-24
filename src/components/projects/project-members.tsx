@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { UserPlus, X } from 'lucide-react'
+import { toast } from '@/components/ui/toaster'
 import type { ProjectMemberRole } from '@/types/database'
 
 const ROLE_LABELS: Record<ProjectMemberRole, string> = {
@@ -40,14 +41,20 @@ export function ProjectMembers({ projectId, members }: Props) {
 
   const addMember = trpc.projects.addMember.useMutation({
     onSuccess: () => {
-      utils.projects.byId.invalidate(projectId)
+      void utils.projects.invalidate()
       setAddOpen(false)
       setSelectedUser('none')
+      toast.success('Miembro agregado al proyecto')
     },
+    onError: (err) => toast.error('No se pudo agregar el miembro', err.message),
   })
 
   const removeMember = trpc.projects.removeMember.useMutation({
-    onSuccess: () => utils.projects.byId.invalidate(projectId),
+    onSuccess: () => {
+      void utils.projects.invalidate()
+      toast.success('Miembro removido del proyecto')
+    },
+    onError: (err) => toast.error('No se pudo remover el miembro', err.message),
   })
 
   function handleAdd() {
@@ -62,7 +69,7 @@ export function ProjectMembers({ projectId, members }: Props) {
   return (
     <div className="max-w-2xl space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-slate-700">{members.length} miembro{members.length !== 1 ? 's' : ''}</h3>
+        <h3 className="text-sm font-semibold text-body">{members.length} miembro{members.length !== 1 ? 's' : ''}</h3>
         <Button size="sm" variant="outline" onClick={() => setAddOpen(true)}>
           <UserPlus className="h-3.5 w-3.5" /> Agregar miembro
         </Button>
@@ -70,7 +77,7 @@ export function ProjectMembers({ projectId, members }: Props) {
 
       <div className="grid gap-2">
         {members.map(m => (
-          <div key={m.id} className="group flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 hover:border-slate-300 transition-colors">
+          <div key={m.id} className="group flex items-center gap-3 rounded-lg border border-border bg-surface px-4 py-3 hover:border-border transition-colors">
             <Avatar className="h-9 w-9 shrink-0">
               <AvatarImage src={m.user?.avatar_url ?? undefined} />
               <AvatarFallback className="text-xs">
@@ -79,15 +86,15 @@ export function ProjectMembers({ projectId, members }: Props) {
             </Avatar>
 
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-slate-900 truncate">{m.user?.name ?? '—'}</p>
-              <p className="text-xs text-slate-400 truncate">{m.user?.position ?? m.user?.email}</p>
+              <p className="text-sm font-medium text-foreground truncate">{m.user?.name ?? '—'}</p>
+              <p className="text-xs text-graphite truncate">{m.user?.position ?? m.user?.email}</p>
             </div>
 
             <Badge variant="secondary" className="text-xs">{ROLE_LABELS[m.role]}</Badge>
 
             <button
               onClick={() => removeMember.mutate({ memberId: m.id })}
-              className="hidden group-hover:flex h-6 w-6 items-center justify-center rounded text-slate-400 hover:text-red-500 transition-colors"
+              className="flex md:hidden md:group-hover:flex h-6 w-6 items-center justify-center rounded text-graphite hover:text-danger transition-colors"
             >
               <X className="h-3.5 w-3.5" />
             </button>
@@ -95,7 +102,7 @@ export function ProjectMembers({ projectId, members }: Props) {
         ))}
 
         {members.length === 0 && (
-          <p className="text-center text-sm text-slate-400 py-8">Sin miembros asignados</p>
+          <p className="text-center text-sm text-graphite py-8">Sin miembros asignados</p>
         )}
       </div>
 
@@ -106,7 +113,7 @@ export function ProjectMembers({ projectId, members }: Props) {
           </DialogHeader>
           <div className="space-y-4 px-6 pb-2">
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-slate-700">Persona</label>
+              <label className="text-sm font-medium text-body">Persona</label>
               <Select value={selectedUser} onValueChange={setSelectedUser}>
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar..." />
@@ -120,7 +127,7 @@ export function ProjectMembers({ projectId, members }: Props) {
               </Select>
             </div>
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-slate-700">Rol</label>
+              <label className="text-sm font-medium text-body">Rol</label>
               <Select value={selectedRole} onValueChange={setSelectedRole}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>

@@ -7,8 +7,10 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { SelectItem } from '@/components/ui/select'
+import { ResponsiveSelect } from '@/components/projects/mobile-bits'
 import type { TaskStatus } from '@/types/database'
+import { toast } from '@/components/ui/toaster'
 
 interface Task {
   id: string
@@ -51,10 +53,11 @@ export function EditTaskDialog({ task, projectId, open, onOpenChange }: Props) {
 
   const update = trpc.tasks.update.useMutation({
     onSuccess: () => {
-      utils.tasks.byProject.invalidate(projectId)
-      utils.tasks.list.invalidate()
+      toast.success('Tarea actualizada')
+      void Promise.all([utils.tasks.invalidate(), utils.projects.invalidate()])
       onOpenChange(false)
     },
+    onError: (e) => toast.error('No se pudo actualizar', e.message),
   })
 
   function handleSubmit(e: React.FormEvent) {
@@ -80,65 +83,56 @@ export function EditTaskDialog({ task, projectId, open, onOpenChange }: Props) {
           <div className="space-y-4 px-6 pb-2">
             <div className="space-y-1.5">
               <Label htmlFor="et-title">Título *</Label>
-              <Input id="et-title" value={title} onChange={e => setTitle(e.target.value)} autoFocus />
+              <Input className="h-12 md:h-9" id="et-title" value={title} onChange={e => setTitle(e.target.value)} autoFocus />
             </div>
 
             <div className="space-y-1.5">
               <Label htmlFor="et-desc">Descripción</Label>
-              <Textarea id="et-desc" value={description} onChange={e => setDescription(e.target.value)} rows={3} />
+              <Textarea className="min-h-[88px] md:min-h-0" id="et-desc" value={description} onChange={e => setDescription(e.target.value)} rows={3} />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>Estado</Label>
-                <Select value={status} onValueChange={v => setStatus(v as TaskStatus)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
+                <ResponsiveSelect value={status} onValueChange={v => setStatus(v as TaskStatus)}>
                     <SelectItem value="todo">Por hacer</SelectItem>
                     <SelectItem value="in_progress">En progreso</SelectItem>
                     <SelectItem value="in_review">En revisión</SelectItem>
                     <SelectItem value="done">Listo</SelectItem>
                     <SelectItem value="canceled">Cancelado</SelectItem>
-                  </SelectContent>
-                </Select>
+                  </ResponsiveSelect>
               </div>
 
               <div className="space-y-1.5">
                 <Label>Prioridad</Label>
-                <Select value={priority} onValueChange={setPriority}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
+                <ResponsiveSelect value={priority} onValueChange={setPriority}>
                     <SelectItem value="very_high">Muy alta</SelectItem>
                     <SelectItem value="high">Alta</SelectItem>
                     <SelectItem value="medium">Media</SelectItem>
                     <SelectItem value="low">Baja</SelectItem>
                     <SelectItem value="very_low">Muy baja</SelectItem>
-                  </SelectContent>
-                </Select>
+                  </ResponsiveSelect>
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label htmlFor="et-due">Fecha límite</Label>
-                <Input id="et-due" type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} />
+                <Input className="h-12 md:h-9" id="et-due" type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} />
               </div>
               <div className="space-y-1.5">
                 <Label>Responsable</Label>
-                <Select value={assigneeId} onValueChange={setAssigneeId}>
-                  <SelectTrigger><SelectValue placeholder="Sin asignar" /></SelectTrigger>
-                  <SelectContent>
+                <ResponsiveSelect value={assigneeId} onValueChange={setAssigneeId}>
                     <SelectItem value="none">Sin asignar</SelectItem>
                     {members?.map(m => (
                       <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
                     ))}
-                  </SelectContent>
-                </Select>
+                  </ResponsiveSelect>
               </div>
             </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="sticky bottom-0 z-10 bg-surface md:static">
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Cancelar</Button>
             <Button type="submit" disabled={!title.trim() || update.isPending}>
               {update.isPending ? 'Guardando…' : 'Guardar cambios'}

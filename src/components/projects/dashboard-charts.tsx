@@ -16,14 +16,14 @@ import {
   Legend,
 } from 'recharts'
 
-/* ── Colours ─────────────────────────────────────────────────────── */
+/* ── Colours — Faro status palette (see Manual de Marca §Charts) ──── */
 
 const TASK_STATUS_COLORS: Record<string, string> = {
-  todo:        '#94a3b8',
-  in_progress: '#3b82f6',
-  in_review:   '#f59e0b',
-  done:        '#10b981',
-  canceled:    '#ef4444',
+  todo:        '#55636B', // graphite
+  in_progress: '#FFB020', // signal
+  in_review:   '#2E6F9E', // info
+  done:        '#17876A', // success
+  canceled:    '#C8453A', // danger
 }
 
 const TASK_STATUS_LABELS: Record<string, string> = {
@@ -35,13 +35,13 @@ const TASK_STATUS_LABELS: Record<string, string> = {
 }
 
 const PROJECT_STATUS_COLORS: Record<string, string> = {
-  not_started: '#94a3b8',
-  in_progress: '#3b82f6',
-  on_hold:     '#f59e0b',
-  delayed:     '#f97316',
-  completed:   '#10b981',
-  canceled:    '#ef4444',
-  pending:     '#8b5cf6',
+  not_started: '#55636B', // graphite
+  in_progress: '#FFB020', // signal
+  on_hold:     '#C67A08', // signal-ink
+  delayed:     '#C8453A', // danger
+  completed:   '#17876A', // success
+  canceled:    '#8B99A2', // muted grey — distinct from delayed/danger
+  pending:     '#7E6BB8', // chart-4
 }
 
 const PROJECT_STATUS_LABELS: Record<string, string> = {
@@ -60,9 +60,9 @@ function CustomTooltip({ active, payload }: { active?: boolean; payload?: Array<
   if (!active || !payload?.length) return null
   const { name, value } = payload[0]
   return (
-    <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-md text-xs">
-      <p className="font-medium text-slate-700">{name}</p>
-      <p className="text-slate-500 tabular-nums">{value} tarea{value !== 1 ? 's' : ''}</p>
+    <div className="rounded-xl bg-night px-3 py-2 text-xs ring-1 ring-transparent dark:bg-surface dark:ring-border">
+      <p className="font-medium text-mist">{name}</p>
+      <p className="text-graphite tabular-nums">{value} tarea{value !== 1 ? 's' : ''}</p>
     </div>
   )
 }
@@ -71,9 +71,9 @@ function ProjectTooltip({ active, payload }: { active?: boolean; payload?: Array
   if (!active || !payload?.length) return null
   const { name, value } = payload[0]
   return (
-    <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-md text-xs">
-      <p className="font-medium text-slate-700">{name}</p>
-      <p className="text-slate-500 tabular-nums">{value} proyecto{value !== 1 ? 's' : ''}</p>
+    <div className="rounded-xl bg-night px-3 py-2 text-xs ring-1 ring-transparent dark:bg-surface dark:ring-border">
+      <p className="font-medium text-mist">{name}</p>
+      <p className="text-graphite tabular-nums">{value} proyecto{value !== 1 ? 's' : ''}</p>
     </div>
   )
 }
@@ -99,7 +99,7 @@ function TasksDonut() {
     .map(([key, value]) => ({
       name: TASK_STATUS_LABELS[key] ?? key,
       value,
-      fill: TASK_STATUS_COLORS[key] ?? '#94a3b8',
+      fill: TASK_STATUS_COLORS[key] ?? '#55636B',
     }))
     .filter(d => d.value > 0)
 
@@ -109,15 +109,15 @@ function TasksDonut() {
 
   if (total === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-8 text-slate-400">
+      <div className="flex flex-col items-center justify-center py-8 text-graphite">
         <p className="text-sm">Sin tareas todavía</p>
       </div>
     )
   }
 
   return (
-    <div className="flex flex-col items-center gap-4">
-      <div className="relative">
+    <div className="flex flex-row items-center gap-5 md:flex-col md:gap-4">
+      <div className="relative shrink-0">
         <PieChart width={160} height={160}>
           <Pie
             data={chartData}
@@ -137,24 +137,24 @@ function TasksDonut() {
         </PieChart>
         {/* Center label */}
         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-          <span className="text-xl font-bold text-slate-800 tabular-nums">{completionPct}%</span>
-          <span className="text-[10px] text-slate-400">completo</span>
+          <span className="text-xl font-bold text-foreground tabular-nums">{completionPct}%</span>
+          <span className="text-[10px] text-graphite">completo</span>
         </div>
       </div>
 
       {/* Legend */}
-      <div className="w-full space-y-1.5">
+      <div className="min-w-0 flex-1 space-y-2 md:w-full md:flex-none md:space-y-1.5">
         {chartData.map(({ name, value, fill }) => (
-          <div key={name} className="flex items-center justify-between text-xs">
+          <div key={name} className="flex items-center justify-between text-[13px] md:text-xs">
             <div className="flex items-center gap-1.5">
               <div className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: fill }} />
-              <span className="text-slate-600">{name}</span>
+              <span className="text-graphite">{name}</span>
             </div>
-            <span className="font-medium text-slate-700 tabular-nums">{value}</span>
+            <span className="font-medium text-body tabular-nums">{value}</span>
           </div>
         ))}
         {data?.overdue ? (
-          <div className="mt-2 rounded-md bg-red-50 px-2 py-1.5 text-xs text-red-600">
+          <div className="mt-2 rounded-md bg-danger-wash px-2 py-1.5 text-xs text-danger">
             ⚠ {data.overdue} tarea{data.overdue !== 1 ? 's' : ''} vencida{data.overdue !== 1 ? 's' : ''}
           </div>
         ) : null}
@@ -177,34 +177,54 @@ function ProjectsBar() {
     .map(([key, value]) => ({
       name: PROJECT_STATUS_LABELS[key] ?? key,
       value,
-      fill: PROJECT_STATUS_COLORS[key] ?? '#94a3b8',
+      fill: PROJECT_STATUS_COLORS[key] ?? '#55636B',
     }))
     .filter(d => d.value > 0)
 
   if (!chartData.length) {
     return (
-      <div className="flex items-center justify-center py-8 text-sm text-slate-400">
+      <div className="flex items-center justify-center py-8 text-sm text-graphite">
         Sin proyectos todavía
       </div>
     )
   }
 
+  const maxValue = Math.max(...chartData.map(d => d.value))
+
   return (
+    <>
+    <ul className="space-y-3 md:hidden">
+      {chartData.map(d => (
+        <li key={d.name}>
+          <div className="mb-1 flex items-center justify-between text-[13px]">
+            <span className="flex items-center gap-2 text-body">
+              <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: d.fill }} />
+              {d.name}
+            </span>
+            <span className="font-semibold tabular-nums text-foreground">{d.value}</span>
+          </div>
+          <div className="h-1.5 overflow-hidden rounded-full bg-border-soft">
+            <div className="h-full rounded-full" style={{ width: `${(d.value / maxValue) * 100}%`, backgroundColor: d.fill }} />
+          </div>
+        </li>
+      ))}
+    </ul>
+    <div className="hidden md:block">
     <ResponsiveContainer width="100%" height={160}>
       <BarChart data={chartData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }} barSize={20}>
         <XAxis
           dataKey="name"
-          tick={{ fontSize: 10, fill: '#94a3b8' }}
+          tick={{ fontSize: 10, fill: 'var(--graphite)' }}
           tickLine={false}
           axisLine={false}
         />
         <YAxis
-          tick={{ fontSize: 10, fill: '#94a3b8' }}
+          tick={{ fontSize: 10, fill: 'var(--graphite)' }}
           tickLine={false}
           axisLine={false}
           allowDecimals={false}
         />
-        <Tooltip content={<ProjectTooltip />} cursor={{ fill: '#f1f5f9' }} />
+        <Tooltip content={<ProjectTooltip />} cursor={{ fill: 'var(--border-soft)' }} />
         <Bar dataKey="value" radius={[4, 4, 0, 0]}>
           {chartData.map((entry, index) => (
             <Cell key={index} fill={entry.fill} />
@@ -212,6 +232,8 @@ function ProjectsBar() {
         </Bar>
       </BarChart>
     </ResponsiveContainer>
+    </div>
+    </>
   )
 }
 
@@ -234,7 +256,7 @@ function TopProjectsProgress() {
     .slice(0, 6)
 
   if (!activeProjects.length) {
-    return <p className="text-sm text-slate-400 py-4 text-center">Sin proyectos activos</p>
+    return <p className="text-sm text-graphite py-4 text-center">Sin proyectos activos</p>
   }
 
   return (
@@ -244,11 +266,11 @@ function TopProjectsProgress() {
           <div className="mb-1 flex items-center justify-between text-xs">
             <div className="flex items-center gap-1.5 min-w-0">
               <div className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: p.color }} />
-              <span className="truncate font-medium text-slate-700">{p.name}</span>
+              <span className="truncate font-medium text-body">{p.name}</span>
             </div>
-            <span className="ml-2 shrink-0 tabular-nums text-slate-500">{p.progress_pct}%</span>
+            <span className="ml-2 shrink-0 tabular-nums text-graphite">{p.progress_pct}%</span>
           </div>
-          <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-border-soft">
             <div
               className="h-full rounded-full transition-all duration-500"
               style={{ width: `${p.progress_pct}%`, backgroundColor: p.color }}
@@ -266,28 +288,28 @@ export function DashboardCharts() {
   return (
     <div className="grid gap-4 md:gap-6 md:grid-cols-3">
       <Card>
-        <CardHeader className="pb-2">
+        <CardHeader className="p-4 pb-2 md:p-6 md:pb-2">
           <CardTitle className="text-sm">Tareas por estado</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-4 pt-0 md:p-6 md:pt-0">
           <TasksDonut />
         </CardContent>
       </Card>
 
       <Card>
-        <CardHeader className="pb-2">
+        <CardHeader className="p-4 pb-2 md:p-6 md:pb-2">
           <CardTitle className="text-sm">Proyectos por estado</CardTitle>
         </CardHeader>
-        <CardContent className="pt-0">
+        <CardContent className="p-4 pt-0 md:p-6 md:pt-0">
           <ProjectsBar />
         </CardContent>
       </Card>
 
       <Card>
-        <CardHeader className="pb-2">
+        <CardHeader className="p-4 pb-2 md:p-6 md:pb-2">
           <CardTitle className="text-sm">Progreso — proyectos activos</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-4 pt-0 md:p-6 md:pt-0">
           <TopProjectsProgress />
         </CardContent>
       </Card>
