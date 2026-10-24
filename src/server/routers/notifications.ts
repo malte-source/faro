@@ -1,13 +1,14 @@
 import { createTRPCRouter, protectedProcedure } from '@/lib/trpc/server'
+import { todayInTZ, addDays } from '@/lib/tz'
 
 export const notificationsRouter = createTRPCRouter({
   list: protectedProcedure.query(async ({ ctx }) => {
     const { me, workspaceIds } = ctx
 
-    const now = new Date()
-    const today = now.toISOString().split('T')[0]
-    const in3days = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-    const in7days = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    // All thresholds in ART — what the user perceives as "today" and "+N days".
+    const today = todayInTZ(undefined, ctx.tz)
+    const in3days = addDays(today, 3)
+    const in7days = addDays(today, 7)
 
     // Run overdue tasks, due-soon tasks, and due projects in parallel
     const [{ data: overdueTasks }, { data: dueSoonTasks }, dueProjectsResult] = await Promise.all([
