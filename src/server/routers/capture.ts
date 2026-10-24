@@ -4,6 +4,7 @@ import { createTRPCRouter, protectedProcedure } from '@/lib/trpc/server'
 import { requireFeature } from '@/lib/plan-limits'
 import { enforceRateLimit } from '@/lib/rate-limit'
 import { triggerAutomations } from '@/lib/automations'
+import { notify } from '@/server/notify'
 import { todayInTZ } from '@/lib/tz'
 import { proposalWarning, weekBounds } from '@/lib/multiempresa'
 import {
@@ -35,6 +36,61 @@ type ProposalRow = Database['public']['Tables']['task_proposals']['Row']
 /** A capture stuck in 'processing' this long lost its worker (instance recycled) — treat as failed. */
 const STALE_PROCESSING_MS = 4 * 60 * 1000
 const AI_BUCKET = { tokensPerMinute: 0.5, maxBurst: 8 }
+
+/** Idempotency key generated on the device (UUID). See supabase/migrations/20261026_capture_idempotency.sql. */
+const clientIdInput = z.string().uuid().optional()
+
+/** Postgres/PostgREST errors that mean "the client_id column doesn't exist (yet)". */
+const missingClientIdColumn = (e: { code?: string; message?: string } | null) =>
+  !!e && (e.code === '42703' || e.code === 'PGRST204' || /client_id/i.test(e.message ?? ''))
+
+/**
+ * The capture this person already created with this clientId, if any. Any error
+ * (column not applied yet, transient failure) behaves like "not found": the
+ * pre-idempotency behaviour, never a failed capture.
+ */
+async function findByClientId(ctx: CaptureCtx, clientId: string | undefined): Promise<CaptureRow | null> {
+  if (!clientId) return null
+  const { data, error } = await ctx.supabase
+    .from('captures')
+    .select('*')
+    .eq('created_by', ctx.me.id)
+    .eq('client_id', clientId)
+    .maybeSingle()
+  return error ? null : data
+}
+
+type NewCapture = Database['public']['Tables']['captures']['Insert']
+
+/**
+ * Insert a capture, carrying the clientId when there is one. A unique violation
+ * means a retry raced the first attempt: return that one (`isNew: false`). If the
+ * column is missing, insert without it.
+ */
+async function insertCapture(
+  ctx: CaptureCtx,
+  base: NewCapture,
+  clientId: string | undefined,
+): Promise<{ capture: CaptureRow; isNew: boolean }> {
+  let attempt = await ctx.supabase
+    .from('captures')
+    .insert(clientId ? { ...base, client_id: clientId } : base)
+    .select('*')
+    .single()
+  if (attempt.error && clientId) {
+    if (attempt.error.code === '23505') {
+      const existing = await findByClientId(ctx, clientId)
+      if (existing) return { capture: existing, isNew: false }
+    }
+    if (missingClientIdColumn(attempt.error)) {
+      attempt = await ctx.supabase.from('captures').insert(base).select('*').single()
+    }
+  }
+  if (attempt.error || !attempt.data) {
+    throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: attempt.error?.message ?? 'No se pudo crear la captura.' })
+  }
+  return { capture: attempt.data, isNew: true }
+}
 
 let bucketReady = false
 
@@ -110,37 +166,57 @@ async function summarize(ctx: CaptureCtx, proposals: ProposalRow[]): Promise<{ c
 export const captureRouter = createTRPCRouter({
   /** Step 1 of a file capture: row + signed upload URL. The browser PUTs the file straight to Storage. */
   createUpload: protectedProcedure
-    .input(z.object({ kind: z.enum(['audio', 'video', 'image']), mimeType: z.string().min(3).max(120) }))
+    .input(z.object({ kind: z.enum(['audio', 'video', 'image']), mimeType: z.string().min(3).max(120), clientId: clientIdInput }))
     .mutation(async ({ ctx, input }) => {
       requireFeature(ctx.activeOrg?.plan, 'ai', 'Captura con IA')
       if (!isMimeOfKind(input.kind as UploadKind, input.mimeType)) {
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'El tipo de archivo no coincide con lo que quieres enviar.' })
       }
+
+      // A retry of something we already have (the offline outbox resends until it hears back):
+      // past 'uploaded' it is already with Faro → say so, no new signed URL, nothing to redo.
+      const prior = await findByClientId(ctx, input.clientId)
+      if (prior && prior.status !== 'uploaded') {
+        return { captureId: prior.id, signedUrl: null as string | null, path: prior.storage_path ?? '', maxBytes: CAPTURE_MAX_BYTES, status: prior.status, duplicate: true }
+      }
+
       await ensureBucket(ctx)
 
-      const { data: capture, error } = await ctx.supabase
-        .from('captures')
-        .insert({
-          org_id: ctx.me.org_id,
-          created_by: ctx.me.id,
-          kind: input.kind,
-          source: 'app',
-          mime_type: input.mimeType.split(';')[0].trim().toLowerCase(),
-          status: 'uploaded',
-        })
-        .select('id, mime_type')
-        .single()
-      if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message })
+      let capture: CaptureRow
+      let duplicate = false
+      if (prior) {
+        capture = prior // still 'uploaded': the file may not have arrived — hand out a fresh URL
+        duplicate = true
+      } else {
+        const inserted = await insertCapture(
+          ctx,
+          {
+            org_id: ctx.me.org_id,
+            created_by: ctx.me.id,
+            kind: input.kind,
+            source: 'app',
+            mime_type: input.mimeType.split(';')[0].trim().toLowerCase(),
+            status: 'uploaded',
+          },
+          input.clientId,
+        )
+        capture = inserted.capture
+        duplicate = !inserted.isNew
+        if (duplicate && capture.status !== 'uploaded') {
+          return { captureId: capture.id, signedUrl: null as string | null, path: capture.storage_path ?? '', maxBytes: CAPTURE_MAX_BYTES, status: capture.status, duplicate: true }
+        }
+      }
 
       const path = `${ctx.me.org_id}/${capture.id}/original.${extForMime(capture.mime_type ?? input.mimeType)}`
-      const { data: signed, error: signErr } = await ctx.supabase.storage.from(CAPTURE_BUCKET).createSignedUploadUrl(path)
+      // upsert: a retried upload may overwrite a half-written object of the same capture.
+      const { data: signed, error: signErr } = await ctx.supabase.storage.from(CAPTURE_BUCKET).createSignedUploadUrl(path, { upsert: true })
       if (signErr || !signed) {
-        await ctx.supabase.from('captures').delete().eq('id', capture.id)
+        if (!duplicate) await ctx.supabase.from('captures').delete().eq('id', capture.id)
         throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: signErr?.message ?? 'No se pudo preparar la subida.' })
       }
       await ctx.supabase.from('captures').update({ storage_path: path }).eq('id', capture.id)
 
-      return { captureId: capture.id, signedUrl: signed.signedUrl, path, maxBytes: CAPTURE_MAX_BYTES }
+      return { captureId: capture.id, signedUrl: signed.signedUrl as string | null, path, maxBytes: CAPTURE_MAX_BYTES, status: capture.status, duplicate }
     }),
 
   /**
@@ -186,23 +262,32 @@ export const captureRouter = createTRPCRouter({
 
   /** Capture from pasted text (chat, notes). */
   submitText: protectedProcedure
-    .input(z.object({ text: z.string().trim().min(3, 'Escribe o pega algo de texto.').max(CAPTURE_TEXT_MAX_CHARS) }))
+    .input(z.object({
+      text: z.string().trim().min(3, 'Escribe o pega algo de texto.').max(CAPTURE_TEXT_MAX_CHARS),
+      clientId: clientIdInput,
+    }))
     .mutation(async ({ ctx, input }) => {
       requireFeature(ctx.activeOrg?.plan, 'ai', 'Captura con IA')
+
+      // A retry from the offline outbox: return the capture we already made (no second AI run,
+      // no rate-limit token spent).
+      const prior = await findByClientId(ctx, input.clientId)
+      if (prior) return { captureId: prior.id, status: prior.status, error: prior.error ?? null }
+
       enforceRateLimit(`${ctx.me.id}:capture`, AI_BUCKET)
-      const { data: capture, error } = await ctx.supabase
-        .from('captures')
-        .insert({
+      const { capture, isNew } = await insertCapture(
+        ctx,
+        {
           org_id: ctx.me.org_id,
           created_by: ctx.me.id,
           kind: 'text',
           source: 'app',
           raw_text: input.text,
           status: 'processing',
-        })
-        .select('*')
-        .single()
-      if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message })
+        },
+        input.clientId,
+      )
+      if (!isNew) return { captureId: capture.id, status: capture.status, error: capture.error ?? null }
 
       await processCapture(ctx, capture, ctx.session.user.name ?? ctx.session.user.email ?? '')
       const { data: after } = await ctx.supabase.from('captures').select('status, error').eq('id', capture.id).single()
@@ -443,7 +528,24 @@ export const captureRouter = createTRPCRouter({
       await ctx.supabase.from('captures').update({ status: 'confirmed' }).eq('id', capture.id)
       const { data: fresh } = await ctx.supabase.from('task_proposals').select('*').eq('capture_id', capture.id).order('position')
       proposals = fresh ?? proposals
-      return summarize(ctx, proposals)
+      const summary = await summarize(ctx, proposals)
+
+      // One notice per person (not one per task): "Te asignaron 3 tareas".
+      for (const n of summary.notified) {
+        const count = n.tasks.length
+        await notify({
+          supabase: ctx.supabase,
+          orgId: ctx.me.org_id,
+          userIds: [n.userId],
+          kind: 'task_assigned',
+          title: count === 1 ? 'Te asignaron una tarea' : `Te asignaron ${count} tareas`,
+          body: count > 1 ? `${n.tasks[0]} y ${count - 1} más` : n.tasks[0],
+          url: '/dashboard/hoy',
+          entity: { type: 'capture', id: capture.id },
+          actorId: ctx.me.id,
+        })
+      }
+      return summary
     }),
 
   discard: protectedProcedure

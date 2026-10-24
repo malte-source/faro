@@ -4,6 +4,7 @@ import { createTRPCRouter, protectedProcedure } from '@/lib/trpc/server'
 import { generateFlash } from '@/lib/gemini'
 import { enforceRateLimit, tryConsume } from '@/lib/rate-limit'
 import { requireFeature } from '@/lib/plan-limits'
+import { notify } from '@/server/notify'
 import { todayInTZ } from '@/lib/tz'
 import { normalize } from '@/lib/multiempresa'
 import { CAPTURE_TEXT_MAX_CHARS } from '@/lib/capture-schema'
@@ -28,6 +29,9 @@ const LAYER_LABEL: Record<CorporateLayer, string> = {
 
 const EMOJI = z.string().min(1).max(16)
 const MESSAGE_PAGE = 60
+/** Per sub-query cap of a delta; hitting it (or a cursor older than 15 min) asks the client for a full refetch. */
+const DELTA_LIMIT = 100
+const DELTA_MAX_AGE_MS = 15 * 60_000
 
 function slugify(text: string): string {
   return normalize(text).replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'canal'
@@ -209,8 +213,44 @@ async function myChannels(ctx: Ctx) {
     .filter(m => m.channel.visibility === 'private' || m.channel.kind === 'dm' || publicAccessOk(ctx, m.channel))
 }
 
-async function unreadByChannel(ctx: Ctx, memberships: Awaited<ReturnType<typeof myChannels>>) {
-  const result = new Map<string, { unread: number; mentions: number; last: MsgRow | null }>()
+type LastMsg = Pick<MsgRow, 'body' | 'created_at' | 'author_id'>
+type UnreadMap = Map<string, { unread: number; mentions: number; last: LastMsg | null }>
+
+/**
+ * Once the SQL function is known to be missing (the migration is applied by hand, after the code is
+ * deployed) don't ask again on every poll: remember for a minute and use the JS path directly.
+ */
+let rpcMissingUntil = 0
+
+/** One aggregate query in Postgres (supabase/migrations/20261027_chat_counts.sql): exact at any volume. */
+async function unreadViaRpc(ctx: Ctx, memberships: Awaited<ReturnType<typeof myChannels>>): Promise<UnreadMap | null> {
+  if (!ctx.activeOrg || Date.now() < rpcMissingUntil) return null
+  const { data, error } = await ctx.supabase.rpc('chat_unread_counts', { p_user: ctx.me.id, p_org: ctx.activeOrg.id })
+  if (error) {
+    if (error.code === 'PGRST202' || error.code === '42883') rpcMissingUntil = Date.now() + 60_000
+    return null
+  }
+  const byChannel = new Map((data ?? []).map(r => [r.channel_id, r]))
+  const result: UnreadMap = new Map()
+  for (const m of memberships) {
+    const r = byChannel.get(m.channel_id)
+    result.set(m.channel_id, {
+      unread: Number(r?.unread ?? 0),
+      mentions: Number(r?.mentions ?? 0),
+      last: r?.last_message_at && r.last_message_body !== null
+        ? { body: r.last_message_body, created_at: r.last_message_at, author_id: r.last_author_id ?? null }
+        : null,
+    })
+  }
+  return result
+}
+
+/**
+ * Fallback (and the original implementation): scans up to 1,500 full messages and counts in JS. It
+ * undercounts past the cap, which is why the SQL path above replaced it.
+ */
+async function unreadViaScan(ctx: Ctx, memberships: Awaited<ReturnType<typeof myChannels>>): Promise<UnreadMap> {
+  const result: UnreadMap = new Map()
   if (!memberships.length) return result
   const minRead = memberships.reduce((min, m) => (m.last_read_at < min ? m.last_read_at : min), memberships[0].last_read_at)
   const floor = new Date(Date.now() - 30 * 86_400_000).toISOString()
@@ -237,7 +277,62 @@ async function unreadByChannel(ctx: Ctx, memberships: Awaited<ReturnType<typeof 
   return result
 }
 
+async function unreadByChannel(ctx: Ctx, memberships: Awaited<ReturnType<typeof myChannels>>): Promise<UnreadMap> {
+  if (!memberships.length) return new Map()
+  return (await unreadViaRpc(ctx, memberships)) ?? (await unreadViaScan(ctx, memberships))
+}
+
 // ── Router ─────────────────────────────────────────────────────────────────
+
+/**
+ * Tell people about a new message: everyone else in a DM; mentioned people (or everyone, for @todos) in a
+ * channel. Muted memberships are skipped. Never throws (notify swallows its own failures).
+ */
+async function notifyMessage(ctx: Ctx, channel: ChannelRow, msg: MsgRow, parentId?: string) {
+  const { data: members } = await ctx.supabase.from('chat_members').select('user_id, muted').eq('channel_id', channel.id)
+  const muted = new Set((members ?? []).filter(m => m.muted).map(m => m.user_id))
+  const live = (members ?? []).filter(m => !m.muted && m.user_id !== ctx.me.id).map(m => m.user_id)
+  const author = ctx.session.user.name ?? 'Alguien'
+  const snippet = msg.body.replace(/\s+/g, ' ').trim().slice(0, 140)
+  const url = `/dashboard/chat?c=${channel.id}&m=${msg.id}${parentId ? `&t=${parentId}` : ''}`
+
+  if (channel.kind === 'dm') {
+    await notify({
+      supabase: ctx.supabase,
+      orgId: channel.org_id,
+      userIds: live,
+      kind: 'dm',
+      title: author,
+      body: snippet,
+      url,
+      entity: { type: 'chat', id: channel.id },
+      actorId: ctx.me.id,
+    })
+    return
+  }
+
+  const targets = new Set<string>()
+  const liveSet = new Set(live)
+  for (const id of msg.mentions) {
+    if (muted.has(id) || id === ctx.me.id) continue
+    // Members always; people who are not members only when the channel is public (they can read it).
+    if (liveSet.has(id) || channel.visibility === 'public') targets.add(id)
+  }
+  if (msg.mention_all) for (const id of live) targets.add(id)
+  if (!targets.size) return
+
+  await notify({
+    supabase: ctx.supabase,
+    orgId: channel.org_id,
+    userIds: Array.from(targets),
+    kind: 'mention',
+    title: `${author} te mencionó en #${channel.name}`,
+    body: snippet,
+    url,
+    entity: { type: 'chat', id: msg.id },
+    actorId: ctx.me.id,
+  })
+}
 
 export const chatRouter = createTRPCRouter({
   /**
@@ -390,11 +485,59 @@ export const chatRouter = createTRPCRouter({
     return { total, mentions }
   }),
 
-  /** Latest top-level messages of a channel (or older ones with `before`). Polled by the open channel. */
+  /**
+   * Latest top-level messages of a channel (or older ones with `before`).
+   *
+   * With `after` (the previous answer's `asOf`, minus a small overlap) it answers a DELTA instead of the
+   * whole page: only the rows that changed since — new messages, edits, deletions, new reactions, and
+   * parents whose thread got/lost a reply — so an open channel polls cheaply. `reset: true` tells the
+   * client the gap is too big (long sleep, busy channel) and it should re-fetch the full page. A removed
+   * reaction leaves no timestamp, so clients also re-fetch the full page on a slow timer.
+   */
   messages: protectedProcedure
-    .input(z.object({ channelId: z.string().uuid(), before: z.string().optional() }))
+    .input(z.object({ channelId: z.string().uuid(), before: z.string().optional(), after: z.string().datetime().optional() }))
     .query(async ({ ctx, input }) => {
+      const asOf = new Date().toISOString() // taken BEFORE the queries: nothing between two polls can fall through
       const { channel, isMember } = await loadChannel(ctx, input.channelId)
+      const channelInfo = { id: channel.id, kind: channel.kind, name: channel.name, description: channel.description, visibility: channel.visibility, isMember }
+
+      if (input.after) {
+        const after = input.after
+        if (Date.now() - Date.parse(after) > DELTA_MAX_AGE_MS) {
+          return { channel: channelInfo, messages: [], hasMore: false, lastReadAt: null, asOf, delta: true, reset: true }
+        }
+        const id = input.channelId
+        const [created, changed, replies, reacted] = await Promise.all([
+          ctx.supabase.from('chat_messages').select('id').eq('channel_id', id).is('parent_id', null).gt('created_at', after).limit(DELTA_LIMIT),
+          ctx.supabase.from('chat_messages').select('id').eq('channel_id', id).is('parent_id', null).or(`edited_at.gt.${after},deleted_at.gt.${after}`).limit(DELTA_LIMIT),
+          ctx.supabase.from('chat_messages').select('parent_id').eq('channel_id', id).not('parent_id', 'is', null).or(`created_at.gt.${after},deleted_at.gt.${after}`).limit(DELTA_LIMIT),
+          ctx.supabase.from('chat_reactions').select('message_id, msg:chat_messages!inner(channel_id, parent_id)').eq('msg.channel_id', id).is('msg.parent_id', null).gt('created_at', after).limit(DELTA_LIMIT),
+        ])
+        const failed = created.error ?? changed.error ?? replies.error ?? reacted.error
+        if (failed) throw failed
+        const ids = new Set<string>()
+        let overflow = false
+        for (const set of [created.data ?? [], changed.data ?? [], replies.data ?? [], reacted.data ?? []]) if (set.length >= DELTA_LIMIT) overflow = true
+        for (const r of created.data ?? []) ids.add(r.id)
+        for (const r of changed.data ?? []) ids.add(r.id)
+        for (const r of replies.data ?? []) if (r.parent_id) ids.add(r.parent_id)
+        for (const r of reacted.data ?? []) ids.add(r.message_id)
+        if (overflow) return { channel: channelInfo, messages: [], hasMore: false, lastReadAt: null, asOf, delta: true, reset: true }
+        if (ids.size === 0) return { channel: channelInfo, messages: [], hasMore: false, lastReadAt: null, asOf, delta: true, reset: false }
+
+        const { data: rows, error } = await ctx.supabase.from('chat_messages').select(MSG_COLS).in('id', Array.from(ids)).is('parent_id', null)
+        if (error) throw error
+        return {
+          channel: channelInfo,
+          messages: await shapeMessages(ctx, (rows ?? []) as MsgRow[]),
+          hasMore: false,
+          lastReadAt: null,
+          asOf,
+          delta: true,
+          reset: false,
+        }
+      }
+
       let q = ctx.supabase
         .from('chat_messages')
         .select(MSG_COLS)
@@ -412,20 +555,54 @@ export const chatRouter = createTRPCRouter({
         ? await ctx.supabase.from('chat_members').select('last_read_at').eq('channel_id', input.channelId).eq('user_id', ctx.me.id).maybeSingle()
         : { data: null }
       return {
-        channel: { id: channel.id, kind: channel.kind, name: channel.name, description: channel.description, visibility: channel.visibility, isMember },
+        channel: channelInfo,
         messages: await shapeMessages(ctx, page),
         hasMore,
         lastReadAt: mem?.last_read_at ?? null,
+        asOf,
+        delta: false,
+        reset: false,
       }
     }),
 
-  /** A thread: the root message and its replies. */
+  /**
+   * A thread: the root message and its replies. With `after` (see `messages`) it answers a delta: the
+   * root is always re-sent (its reply count and reactions move) plus only the replies that changed.
+   */
   thread: protectedProcedure
-    .input(z.object({ parentId: z.string().uuid() }))
+    .input(z.object({ parentId: z.string().uuid(), after: z.string().datetime().optional() }))
     .query(async ({ ctx, input }) => {
+      const asOf = new Date().toISOString()
       const { data: root } = await ctx.supabase.from('chat_messages').select(MSG_COLS).eq('id', input.parentId).maybeSingle()
       if (!root) throw new TRPCError({ code: 'NOT_FOUND' })
       await loadChannel(ctx, (root as MsgRow).channel_id)
+
+      if (input.after) {
+        const after = input.after
+        if (Date.now() - Date.parse(after) > DELTA_MAX_AGE_MS) {
+          const [shapedRoot] = await shapeMessages(ctx, [root as MsgRow])
+          return { root: shapedRoot, replies: [], asOf, delta: true, reset: true }
+        }
+        const [changed, reacted] = await Promise.all([
+          ctx.supabase.from('chat_messages').select('id').eq('parent_id', input.parentId).or(`created_at.gt.${after},edited_at.gt.${after},deleted_at.gt.${after}`).limit(DELTA_LIMIT),
+          ctx.supabase.from('chat_reactions').select('message_id, msg:chat_messages!inner(parent_id)').eq('msg.parent_id', input.parentId).gt('created_at', after).limit(DELTA_LIMIT),
+        ])
+        const failed = changed.error ?? reacted.error
+        if (failed) throw failed
+        const overflow = (changed.data ?? []).length >= DELTA_LIMIT || (reacted.data ?? []).length >= DELTA_LIMIT
+        const ids = new Set<string>()
+        for (const r of changed.data ?? []) ids.add(r.id)
+        for (const r of reacted.data ?? []) ids.add(r.message_id)
+        let replyRows: MsgRow[] = []
+        if (!overflow && ids.size > 0) {
+          const { data, error } = await ctx.supabase.from('chat_messages').select(MSG_COLS).in('id', Array.from(ids)).eq('parent_id', input.parentId)
+          if (error) throw error
+          replyRows = (data ?? []) as MsgRow[]
+        }
+        const shaped = await shapeMessages(ctx, [root as MsgRow, ...replyRows])
+        return { root: shaped[0], replies: shaped.slice(1), asOf, delta: true, reset: overflow }
+      }
+
       const { data: replies } = await ctx.supabase
         .from('chat_messages')
         .select(MSG_COLS)
@@ -433,7 +610,7 @@ export const chatRouter = createTRPCRouter({
         .order('created_at', { ascending: true })
         .limit(300)
       const shaped = await shapeMessages(ctx, [root as MsgRow, ...((replies ?? []) as MsgRow[])])
-      return { root: shaped[0], replies: shaped.slice(1) }
+      return { root: shaped[0], replies: shaped.slice(1), asOf, delta: false, reset: false }
     }),
 
   send: protectedProcedure
@@ -472,6 +649,7 @@ export const chatRouter = createTRPCRouter({
       if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message })
 
       await ctx.supabase.from('chat_members').update({ last_read_at: new Date().toISOString() }).eq('channel_id', channel.id).eq('user_id', ctx.me.id)
+      await notifyMessage(ctx, channel, data as MsgRow, input.parentId)
       return (await shapeMessages(ctx, [data as MsgRow]))[0]
     }),
 

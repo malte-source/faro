@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { addDays, todayInTZ, DEFAULT_TZ, isValidTZ } from '@/lib/tz'
 import { createAdminSupabaseClient } from '@/lib/supabase'
 import { generateFlash, stripJsonFence } from '@/lib/gemini'
+// Side effect: registers the AI usage sink + budget guard (the cron route runs outside tRPC).
+import '@/server/ai-usage'
 import {
   postToChatWebhook,
   weeklyDigestCard,
@@ -10,6 +12,7 @@ import {
 import { nextFireDate } from '@/lib/recurring'
 import { cronOutcome, decideRuleClaim, isBearerAuthorized, type CronResult } from '@/lib/cron-utils'
 import { runDueSoonAutomations, runHealthLowAutomations } from '@/lib/automations'
+import { notify } from '@/server/notify'
 
 /**
  * Protected cron endpoint hit by Google Cloud Scheduler on a schedule.
@@ -146,7 +149,8 @@ Hoy: ${today}.
 Devuelve sin markdown:
 {"headline":"...","highlights":["...","..."],"risks":["..."],"asks":["..."],"nextWeekFocus":"..."}`
 
-        const txt = stripJsonFence(await generateFlash(prompt))
+        // Metered and budgeted against THIS organisation (cron has no request context).
+        const txt = stripJsonFence(await generateFlash(prompt, { feature: 'cron.weekly-digest', orgId: org.id }))
         const parsed = JSON.parse(txt)
         payload = {
           headline: parsed.headline ?? fallbackDigest.headline,
@@ -218,6 +222,70 @@ function deadlineCard(payload: {
   }
 }
 
+/**
+ * Morning push: "Hoy vencen 3 tareas" to each person who has tasks due today, in every org (not only the
+ * ones with a Google Chat webhook). Idempotent per person: someone who already got today's deadline notice
+ * (a retry, a double trigger) is skipped. Returns how many people were notified.
+ */
+async function pushDailyDeadlines(supabase: ReturnType<typeof createAdminSupabaseClient>): Promise<number> {
+  const { data: orgs } = await supabase.from('organizations').select('id, timezone')
+  let notified = 0
+  for (const org of orgs ?? []) {
+    try {
+      const today = todayInTZ(new Date(), resolveTz(org.timezone))
+      const { data: workspaces } = await supabase.from('workspaces').select('id').eq('org_id', org.id)
+      const wsIds = (workspaces ?? []).map(w => w.id)
+      if (!wsIds.length) continue
+
+      const { data: tasks } = await supabase
+        .from('tasks')
+        .select('title, assignee_id, project:projects!inner(workspace_id)')
+        .in('project.workspace_id', wsIds)
+        .eq('due_date', today)
+        .not('assignee_id', 'is', null)
+        .not('status', 'in', '(done,canceled)')
+        .limit(2000)
+
+      const byPerson = new Map<string, string[]>()
+      for (const t of tasks ?? []) {
+        if (!t.assignee_id) continue
+        byPerson.set(t.assignee_id, [...(byPerson.get(t.assignee_id) ?? []), t.title])
+      }
+      if (!byPerson.size) continue
+
+      // Skip people already told today.
+      const since = new Date(Date.now() - 20 * 60 * 60 * 1000).toISOString()
+      const { data: already } = await supabase
+        .from('notifications')
+        .select('user_id')
+        .eq('org_id', org.id)
+        .eq('kind', 'deadline')
+        .gte('created_at', since)
+        .in('user_id', Array.from(byPerson.keys()))
+      const done = new Set((already ?? []).map(a => a.user_id))
+
+      for (const [userId, titles] of byPerson) {
+        if (done.has(userId)) continue
+        const n = titles.length
+        const result = await notify({
+          supabase,
+          orgId: org.id,
+          userIds: [userId],
+          kind: 'deadline',
+          title: n === 1 ? 'Hoy vence 1 tarea' : `Hoy vencen ${n} tareas`,
+          body: n > 2 ? `${titles[0]}, ${titles[1]} y ${n - 2} más` : titles.join(' · '),
+          url: '/dashboard/hoy',
+          entity: { type: 'deadline', id: org.id },
+        })
+        if (result.stored) notified++
+      }
+    } catch (err) {
+      console.error('[cron daily-deadlines] push failed for org', org.id, err)
+    }
+  }
+  return notified
+}
+
 async function runDailyDeadlines(): Promise<CronResult> {
   const orgs = await getOrgsWithWebhooks()
   const supabase = createAdminSupabaseClient()
@@ -273,6 +341,13 @@ async function runDailyDeadlines(): Promise<CronResult> {
       failed.push(org.id)
       console.error('[cron daily-deadlines] failed for org', org.id, err)
     }
+  }
+  try {
+    sent += await pushDailyDeadlines(supabase)
+  } catch (err) {
+    errors++
+    failed.push('push')
+    console.error('[cron daily-deadlines] push step failed', err)
   }
   return { sent, skipped, errors, failed }
 }

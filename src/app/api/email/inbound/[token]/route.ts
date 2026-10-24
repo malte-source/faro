@@ -156,7 +156,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   // Verify token matches a project.
   const { data: project } = await supabase
     .from('projects')
-    .select('id, code, name, created_by, workspace:workspaces(org_id)')
+    .select('id, code, name, created_by, workspace:workspaces!projects_workspace_id_fkey(org_id)')
     .eq('inbound_token', token)
     .single()
 

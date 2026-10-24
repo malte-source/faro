@@ -28,7 +28,7 @@ export const goalsRouter = createTRPCRouter({
         .select(`
           *,
           owner:users!goals_owner_id_fkey(id, name, avatar_url),
-          parent:goals!goals_parent_goal_id_fkey(id, title)
+          parent:goals!parent_goal_id(id, title)
         `)
         .eq('org_id', ctx.me.org_id)
         .order('target_date', { ascending: true, nullsFirst: false })
@@ -83,7 +83,7 @@ export const goalsRouter = createTRPCRouter({
         .select(`
           *,
           owner:users!goals_owner_id_fkey(id, name, avatar_url),
-          parent:goals!goals_parent_goal_id_fkey(id, title)
+          parent:goals!parent_goal_id(id, title)
         `)
         .eq('id', input)
         .eq('org_id', ctx.me.org_id)

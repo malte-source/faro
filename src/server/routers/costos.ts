@@ -4,6 +4,7 @@ import { createTRPCRouter, protectedProcedure } from '@/lib/trpc/server'
 import { generateFlash } from '@/lib/gemini'
 import { enforceRateLimit } from '@/lib/rate-limit'
 import { requireFeature } from '@/lib/plan-limits'
+import { notify } from '@/server/notify'
 import {
   METHOD_LABEL,
   allocate,
@@ -304,6 +305,20 @@ export const costosRouter = createTRPCRouter({
           await ctx.supabase.from('charge_runs').delete().eq('id', run.id)
           throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: linesErr.message })
         }
+
+        // Segregation of duties: the preparer can't approve, so tell the OTHER people in Dirección there is one waiting.
+        const { data: direction } = await ctx.supabase.from('org_memberships').select('user_id').eq('org_id', orgId).in('role', ['owner', 'admin'])
+        await notify({
+          supabase: ctx.supabase,
+          orgId,
+          userIds: (direction ?? []).map(d => d.user_id),
+          kind: 'cost_run',
+          title: 'Hay un reparto de costos por aprobar',
+          body: `Período ${input.period}: lo preparó ${ctx.session.user.name ?? 'alguien de Dirección'}.`,
+          url: '/dashboard/costos',
+          entity: { type: 'cost_run', id: run.id },
+          actorId: ctx.me.id,
+        })
         return { runId: run.id, lines: lines.length, warnings: result.warnings }
       }),
 

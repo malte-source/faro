@@ -6,6 +6,10 @@ import type { Session } from 'next-auth'
 import { DEFAULT_TZ, isValidTZ } from '@/lib/tz'
 import { computeVisibility, needsSharedLookup, resolveMyWorkspaceIds, type RawProject } from '@/lib/visibility'
 import { leaksInternals, SAFE_INTERNAL_MESSAGE } from '@/lib/safe-errors'
+import { runWithAiContext } from '@/lib/ai-context'
+import { AiBudgetError } from '@/lib/ai-budget'
+// Side effect: registers the Gemini usage sink + budget guard in this server process.
+import '@/server/ai-usage'
 
 /**
  * Server-side context cache.
@@ -352,7 +356,7 @@ export const createTRPCContext = async (preloadedSession?: Session | null, heade
           const [{ data: workspaces, error: wsErr }, { data: org }] = await Promise.all([
             supabase
               .from('workspaces')
-              .select('id, projects(id, visibility, created_by)')
+              .select('id, projects!projects_workspace_id_fkey(id, visibility, created_by)')
               .eq('org_id', orgId)
               .abortSignal(signal),
             supabase
@@ -504,11 +508,13 @@ const t = initTRPC.context<typeof createTRPCContext>().create({
 export const createTRPCRouter = t.router
 export const publicProcedure = t.procedure
 
-export const protectedProcedure = t.procedure.use(({ ctx, next }) => {
+export const protectedProcedure = t.procedure.use(async ({ ctx, next, path }) => {
   if (!ctx.session?.user?.email || !ctx.me) {
     throw new TRPCError({ code: 'UNAUTHORIZED' })
   }
-  return next({
+  // Every Gemini call made while this procedure runs is attributed (and budgeted) to this
+  // organisation/person without any call site passing them down (see ai-context.ts).
+  const result = await runWithAiContext({ orgId: ctx.activeOrg?.id ?? null, userId: ctx.me.id, path }, () => next({
     ctx: {
       ...ctx,
       session: ctx.session as NonNullable<typeof ctx.session> & {
@@ -524,5 +530,11 @@ export const protectedProcedure = t.procedure.use(({ ctx, next }) => {
       myOrgs: ctx.myOrgs,
       activeOrg: ctx.activeOrg,
     },
-  })
+  }))
+  // tRPC hands a downstream throw back as `result.error` (wrapped, cause intact): an exhausted AI
+  // budget is a clear, user-facing "no", not an internal error.
+  if (!result.ok && result.error.cause instanceof AiBudgetError) {
+    throw new TRPCError({ code: 'FORBIDDEN', message: result.error.cause.message, cause: result.error.cause })
+  }
+  return result
 })

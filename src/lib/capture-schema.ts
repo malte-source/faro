@@ -33,6 +33,7 @@ const EXT_BY_MIME: Record<string, string> = {
   'audio/mp3': 'mp3',
   'audio/mp4': 'm4a',
   'audio/x-m4a': 'm4a',
+  'audio/m4a': 'm4a',
   'audio/aac': 'aac',
   'audio/wav': 'wav',
   'audio/x-wav': 'wav',

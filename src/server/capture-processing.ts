@@ -1,5 +1,6 @@
 import { generateFlash, stripJsonFence } from '@/lib/gemini'
 import { todayInTZ } from '@/lib/tz'
+import { geminiMimeType } from '@/lib/capture-media'
 import {
   normalize,
   proposalWarning,
@@ -167,7 +168,7 @@ export async function processCapture(ctx: CaptureCtx, capture: CaptureRow, autho
     if (hasMedia) {
       if (!capture.storage_path) throw new CaptureFailure(CAPTURE_FAILED_MESSAGE)
       const media = await downloadBase64(ctx, capture.storage_path)
-      parts.push({ inlineData: { data: media.data, mimeType: capture.mime_type ?? 'application/octet-stream' } })
+      parts.push({ inlineData: { data: media.data, mimeType: geminiMimeType(capture.kind, capture.mime_type) } })
     } else if (!capture.raw_text?.trim()) {
       throw new CaptureFailure(CAPTURE_FAILED_MESSAGE)
     }
@@ -185,6 +186,8 @@ export async function processCapture(ctx: CaptureCtx, capture: CaptureRow, autho
         systemInstruction: SYSTEM_INSTRUCTION,
         responseJsonSchema: CAPTURE_JSON_SCHEMA,
         temperature: 0.2,
+        feature: 'capture',
+        orgId: ctx.me.org_id,
       })
     } catch (err) {
       throw new CaptureFailure(CAPTURE_FAILED_MESSAGE, err)

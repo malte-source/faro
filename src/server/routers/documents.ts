@@ -4,6 +4,7 @@ import { createTRPCRouter, protectedProcedure } from '@/lib/trpc/server'
 import { generateFlash, stripJsonFence } from '@/lib/gemini'
 import { enforceRateLimit } from '@/lib/rate-limit'
 import { requireFeature } from '@/lib/plan-limits'
+import { notify } from '@/server/notify'
 import { addDays, todayInTZ } from '@/lib/tz'
 import { normalize } from '@/lib/multiempresa'
 import { isDirection, loadPeople, visibleEmpresas } from '@/server/multiempresa'
@@ -453,6 +454,17 @@ export const documentsRouter = createTRPCRouter({
       await assertOrgPerson(ctx, reviewerId)
       if (!doc.body_md.trim()) throw new TRPCError({ code: 'BAD_REQUEST', message: 'El documento está vacío.' })
       await ctx.supabase.from('documents').update({ status: 'en_revision', reviewer_id: reviewerId }).eq('id', doc.id)
+      await notify({
+        supabase: ctx.supabase,
+        orgId: ctx.me.org_id,
+        userIds: [reviewerId],
+        kind: 'doc_review',
+        title: 'Te piden revisar un documento',
+        body: doc.title,
+        url: `/dashboard/documentos/${doc.id}`,
+        entity: { type: 'document', id: doc.id },
+        actorId: ctx.me.id,
+      })
       return { ok: true }
     }),
 
@@ -477,6 +489,17 @@ export const documentsRouter = createTRPCRouter({
           next_review_at: doc.next_review_at ?? addDays(today, DEFAULT_REVIEW_DAYS),
         })
         .eq('id', doc.id)
+      await notify({
+        supabase: ctx.supabase,
+        orgId: ctx.me.org_id,
+        userIds: [doc.owner_id, doc.created_by],
+        kind: 'doc_decision',
+        title: 'Aprobaron tu documento',
+        body: doc.title,
+        url: `/dashboard/documentos/${doc.id}`,
+        entity: { type: 'document', id: doc.id },
+        actorId: ctx.me.id,
+      })
       return { ok: true }
     }),
 
@@ -490,6 +513,17 @@ export const documentsRouter = createTRPCRouter({
       // The comment lives in the version history, attached to the content that was reviewed.
       await snapshot(ctx, doc, `Cambios pedidos por ${who}: ${input.comment}`)
       await ctx.supabase.from('documents').update({ status: 'borrador' }).eq('id', doc.id)
+      await notify({
+        supabase: ctx.supabase,
+        orgId: ctx.me.org_id,
+        userIds: [doc.owner_id, doc.created_by],
+        kind: 'doc_decision',
+        title: 'Pidieron cambios en tu documento',
+        body: `${doc.title} — ${input.comment}`,
+        url: `/dashboard/documentos/${doc.id}`,
+        entity: { type: 'document', id: doc.id },
+        actorId: ctx.me.id,
+      })
       return { ok: true }
     }),
 

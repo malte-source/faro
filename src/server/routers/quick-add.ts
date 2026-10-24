@@ -5,6 +5,7 @@ import { todayInTZ } from '@/lib/tz'
 import { parseQuickAdd } from '@/lib/multiempresa'
 import { ensureInboxProject, loadPeople, visibleEmpresas } from '@/server/multiempresa'
 import { triggerAutomations } from '@/lib/automations'
+import { notify } from '@/server/notify'
 
 /**
  * Create a task in one line: "Pagar proveedores #mesa @andy viernes".
@@ -69,6 +70,20 @@ export const quickAddRouter = createTRPCRouter({
         .select('id, project_id, title, status, priority, assignee_id, due_date, labels')
         .single()
       if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message })
+
+      if (data.assignee_id) {
+        await notify({
+          supabase: ctx.supabase,
+          orgId: ctx.me.org_id,
+          userIds: [data.assignee_id],
+          kind: 'task_assigned',
+          title: 'Te asignaron una tarea',
+          body: data.title,
+          url: '/dashboard/hoy',
+          entity: { type: 'task', id: data.id },
+          actorId: ctx.me.id,
+        })
+      }
 
       void triggerAutomations(ctx.supabase, {
         trigger: 'task.created',

@@ -71,7 +71,7 @@ export const decisionsRouter = createTRPCRouter({
         .from('decisions')
         .select(`
           id, title, description, status, project_id, resolved_option_id, created_at, updated_at,
-          options:decision_options(id, label),
+          options:decision_options!decision_options_decision_id_fkey(id, label),
           criteria:decision_criteria(id)
         `)
         .eq('org_id', me.org_id)

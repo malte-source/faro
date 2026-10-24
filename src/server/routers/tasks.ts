@@ -8,6 +8,7 @@ import { parsedTaskSchema, parsedAudioTaskSchema, parsedImageTaskSchema, meeting
 import { enforceRateLimit, gcBuckets } from '@/lib/rate-limit'
 import { limitsFor, requireFeature } from '@/lib/plan-limits'
 import { triggerAutomations } from '@/lib/automations'
+import { notify } from '@/server/notify'
 import type { TaskStatus } from '@/types/database'
 
 export const tasksRouter = createTRPCRouter({
@@ -148,6 +149,20 @@ export const tasksRouter = createTRPCRouter({
         .single()
 
       if (error) throw error
+
+      if (data.assignee_id) {
+        await notify({
+          supabase: ctx.supabase,
+          orgId: ctx.me.org_id,
+          userIds: [data.assignee_id],
+          kind: 'task_assigned',
+          title: 'Te asignaron una tarea',
+          body: data.title,
+          url: `/dashboard/projects/${data.project_id}`,
+          entity: { type: 'task', id: data.id },
+          actorId: me.id,
+        })
+      }
 
       // Fire automations matching 'task.created' for the org.
       void triggerAutomations(ctx.supabase, {
@@ -858,6 +873,19 @@ Devuelve SOLO JSON sin markdown:
         .select('id, title, reviewer_id, project:projects(id, code)')
         .single()
       if (error) throw error
+      if (data.reviewer_id) {
+        await notify({
+          supabase: ctx.supabase,
+          orgId: ctx.me.org_id,
+          userIds: [data.reviewer_id],
+          kind: 'task_review',
+          title: 'Te piden revisar una tarea',
+          body: data.title,
+          url: data.project ? `/dashboard/projects/${(data.project as { id: string }).id}` : '/dashboard/tasks',
+          entity: { type: 'task', id: data.id },
+          actorId: ctx.me.id,
+        })
+      }
       return data
     }),
 
@@ -878,6 +906,17 @@ Devuelve SOLO JSON sin markdown:
         .select()
         .single()
       if (error) throw error
+      await notify({
+        supabase: ctx.supabase,
+        orgId: ctx.me.org_id,
+        userIds: [data.assignee_id, data.reporter_id],
+        kind: 'task_review',
+        title: 'Aprobaron tu tarea',
+        body: data.title,
+        url: `/dashboard/projects/${data.project_id}`,
+        entity: { type: 'task', id: data.id },
+        actorId: ctx.me.id,
+      })
       return data
     }),
 
@@ -897,6 +936,17 @@ Devuelve SOLO JSON sin markdown:
         .select()
         .single()
       if (error) throw error
+      await notify({
+        supabase: ctx.supabase,
+        orgId: ctx.me.org_id,
+        userIds: [data.assignee_id],
+        kind: 'task_review',
+        title: 'Pidieron cambios en tu tarea',
+        body: data.title,
+        url: `/dashboard/projects/${data.project_id}`,
+        entity: { type: 'task', id: data.id },
+        actorId: ctx.me.id,
+      })
       return data
     }),
 
@@ -1172,6 +1222,13 @@ Devuelve SOLO JSON sin markdown:
         prevStatus = (prev?.status ?? null) as TaskStatus | null
       }
 
+      // Only when the assignee is part of this edit: who had the task before?
+      let prevAssignee: string | null = null
+      if (rest.assigneeId !== undefined) {
+        const { data: prevA } = await ctx.supabase.from('tasks').select('assignee_id').eq('id', id).single()
+        prevAssignee = prevA?.assignee_id ?? null
+      }
+
       // IDOR fix: scope update to user's own projects.
       const { data, error } = await ctx.supabase
         .from('tasks')
@@ -1192,6 +1249,20 @@ Devuelve SOLO JSON sin markdown:
         .single()
 
       if (error) throw error
+
+      if (rest.assigneeId && rest.assigneeId !== prevAssignee) {
+        await notify({
+          supabase: ctx.supabase,
+          orgId: ctx.me.org_id,
+          userIds: [rest.assigneeId],
+          kind: 'task_assigned',
+          title: prevAssignee ? 'Te reasignaron una tarea' : 'Te asignaron una tarea',
+          body: data.title,
+          url: `/dashboard/projects/${data.project_id}`,
+          entity: { type: 'task', id: data.id },
+          actorId: ctx.me.id,
+        })
+      }
 
       // Fire status-change automation if the status actually transitioned.
       if (rest.status && prevStatus && prevStatus !== rest.status) {

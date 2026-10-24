@@ -5,6 +5,7 @@ import { teamRouter } from './team'
 import { auditRouter } from './audit'
 import { searchRouter } from './search'
 import { notificationsRouter } from './notifications'
+import { emailPrefsRouter } from './email-prefs'
 import { commentsRouter } from './comments'
 import { decisionsRouter } from './decisions'
 import { aiChatRouter } from './ai-chat'
@@ -33,6 +34,7 @@ import { chatRouter } from './chat'
 import { documentsRouter } from './documents'
 import { captureRouter } from './capture'
 import { costosRouter } from './costos'
+import { aiUsageRouter } from './ai-usage'
 
 export const appRouter = createTRPCRouter({
   projects: projectsRouter,
@@ -41,6 +43,7 @@ export const appRouter = createTRPCRouter({
   audit: auditRouter,
   search: searchRouter,
   notifications: notificationsRouter,
+  emailPrefs: emailPrefsRouter,
   comments: commentsRouter,
   decisions: decisionsRouter,
   aiChat: aiChatRouter,
@@ -69,6 +72,7 @@ export const appRouter = createTRPCRouter({
   documents: documentsRouter,
   capture: captureRouter,
   costos: costosRouter,
+  aiUsage: aiUsageRouter,
 })
 
 export type AppRouter = typeof appRouter
