@@ -2,29 +2,34 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { CAPTURE_MAX_SECONDS } from '@/lib/capture-schema'
+import { pickRecorderMime } from '@/lib/capture-media'
 
 export interface RecordingResult {
   blob: Blob
-  /** Container MIME as recorded: webm/opus on Chrome & Firefox, mp4/aac on Safari/iOS. */
+  /** Container MIME as recorded: mp4/aac on Safari/iOS, webm/opus on Chrome & Firefox. */
   mimeType: string
   durationSec: number
 }
 
 const BARS = 36
-// Order matters: prefer opus-in-webm, fall back to AAC-in-mp4 (iOS/Safari).
-const MIME_CANDIDATES = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4;codecs=mp4a.40.2', 'audio/mp4']
-
 function pickMime(): string {
   if (typeof MediaRecorder === 'undefined') return ''
-  return MIME_CANDIDATES.find(m => MediaRecorder.isTypeSupported(m)) ?? ''
+  return pickRecorderMime(m => MediaRecorder.isTypeSupported(m))
 }
+
+interface WakeLockSentinelLike { release: () => Promise<void> }
 
 /**
  * Microphone recorder with a live level meter (for the Señal waveform).
  * `stop()` resolves with the recording; `cancel()` throws it away. Recording
  * ends by itself at CAPTURE_MAX_SECONDS and reports through `onLimit`.
+ *
+ * While recording it keeps the screen awake (Screen Wake Lock) and, if the page
+ * is hidden or closed (a call comes in, the app is backgrounded — iOS then kills
+ * the microphone anyway), it STOPS and hands what was recorded to `onInterrupt`
+ * (falling back to `onLimit`) instead of losing it.
  */
-export function useRecorder(opts: { onLimit?: (r: RecordingResult) => void } = {}) {
+export function useRecorder(opts: { onLimit?: (r: RecordingResult) => void; onInterrupt?: (r: RecordingResult) => void } = {}) {
   const [recording, setRecording] = useState(false)
   const [elapsed, setElapsed] = useState(0)
   const [levels, setLevels] = useState<number[]>(() => Array(BARS).fill(0.08))
@@ -32,6 +37,11 @@ export function useRecorder(opts: { onLimit?: (r: RecordingResult) => void } = {
 
   const onLimitRef = useRef(opts.onLimit)
   useEffect(() => { onLimitRef.current = opts.onLimit }, [opts.onLimit])
+  const onInterruptRef = useRef(opts.onInterrupt)
+  useEffect(() => { onInterruptRef.current = opts.onInterrupt }, [opts.onInterrupt])
+  const interruptedRef = useRef(false)
+  const wakeLockRef = useRef<WakeLockSentinelLike | null>(null)
+  const detachRef = useRef<(() => void) | null>(null)
 
   const recRef = useRef<MediaRecorder | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
@@ -44,6 +54,10 @@ export function useRecorder(opts: { onLimit?: (r: RecordingResult) => void } = {
   const discardRef = useRef(false)
 
   const teardown = useCallback(() => {
+    detachRef.current?.()
+    detachRef.current = null
+    void wakeLockRef.current?.release().catch(() => {})
+    wakeLockRef.current = null
     if (timerRef.current) clearInterval(timerRef.current)
     if (meterRef.current) clearInterval(meterRef.current)
     timerRef.current = meterRef.current = null
@@ -90,8 +104,10 @@ export function useRecorder(opts: { onLimit?: (r: RecordingResult) => void } = {
         teardown()
         const resolve = resolveRef.current
         resolveRef.current = null
+        const interrupted = interruptedRef.current
+        interruptedRef.current = false
         if (resolve) resolve(result)
-        else if (result) onLimitRef.current?.(result)
+        else if (result) (interrupted ? (onInterruptRef.current ?? onLimitRef.current) : onLimitRef.current)?.(result)
       }
       recRef.current = rec
 
@@ -111,6 +127,28 @@ export function useRecorder(opts: { onLimit?: (r: RecordingResult) => void } = {
           const level = Math.min(1, Math.max(0.08, (sum / buf.length / 255) * 2.2))
           setLevels(prev => [...prev.slice(1), level])
         }, 70)
+      }
+
+      // Keep the screen on while recording (best effort: Android Chrome, iOS 18.4+ installed apps).
+      try {
+        const wl = await (navigator as unknown as { wakeLock?: { request: (t: 'screen') => Promise<WakeLockSentinelLike> } }).wakeLock?.request('screen')
+        if (wl) wakeLockRef.current = wl
+      } catch { /* denied or unsupported: recording still works */ }
+
+      // The page going away must not lose the recording: stop now, deliver what we have.
+      interruptedRef.current = false
+      const interrupt = () => {
+        const r = recRef.current
+        if (!r || r.state === 'inactive') return
+        interruptedRef.current = true
+        r.stop()
+      }
+      const onHide = () => { if (document.visibilityState === 'hidden') interrupt() }
+      document.addEventListener('visibilitychange', onHide)
+      window.addEventListener('pagehide', interrupt)
+      detachRef.current = () => {
+        document.removeEventListener('visibilitychange', onHide)
+        window.removeEventListener('pagehide', interrupt)
       }
 
       startedAtRef.current = Date.now()

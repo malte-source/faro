@@ -1,5 +1,5 @@
 import { Header } from '@/components/layout/header'
-import { ProjectGantt } from '@/components/projects/project-gantt'
+import { ProjectGantt } from '@/components/projects/project-gantt-lazy'
 
 export default function GanttPage() {
   return (

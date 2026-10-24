@@ -12,7 +12,12 @@ import { SavedViews, type ViewFilters } from '@/components/tasks/saved-views'
 import { PRIORITY } from '@/lib/utils'
 import { Plus, AlertCircle, LayoutList, User, ChevronRight } from 'lucide-react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import type { TaskStatus } from '@/types/database'
+import { changeStatusWithUndo } from '@/lib/task-undo'
+import { usePendingDeletes } from '@/stores/pending-deletes'
+import { ROW_FOCUS_RING, useListNavigation } from '@/components/shortcuts/use-list-navigation'
+import { useIsMobile } from '@/components/mobile/use-media'
 import { DueDateChip } from '@/components/ui/due-date-chip'
 import { Segmented } from '@/components/mobile/segmented'
 import { InsetGroup, ListRow, IconTile } from '@/components/mobile/inset-list'
@@ -81,6 +86,9 @@ export function TasksOverview() {
   const { data: members } = trpc.team.members.useQuery()
   const utils = trpc.useUtils()
 
+  // Tasks being deleted from the detail panel (undo window open) vanish from the list at once.
+  const pendingDeletes = usePendingDeletes(st => st.ids)
+
   const sortedTasks = useMemo(() => {
     if (!tasks) return []
     const PRIORITY_ORDER: Record<string, number> = {
@@ -89,7 +97,7 @@ export function TasksOverview() {
     const STATUS_ORDER: Record<string, number> = {
       in_progress: 0, in_review: 1, todo: 2, done: 3, canceled: 4,
     }
-    return [...tasks].sort((a, b) => {
+    return tasks.filter(t => !pendingDeletes.has(t.id)).sort((a, b) => {
       switch (sortBy) {
         case 'due_date': {
           if (!a.due_date && !b.due_date) return 0
@@ -105,7 +113,7 @@ export function TasksOverview() {
           return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       }
     })
-  }, [tasks, sortBy])
+  }, [tasks, sortBy, pendingDeletes])
 
   const updateTask = trpc.tasks.update.useMutation({
     onMutate: async (input) => {
@@ -176,8 +184,27 @@ export function TasksOverview() {
     ...(onlyBlocked ? [{ key: 'blocked', label: 'Bloqueadas', clear: () => setOnlyBlocked(false) }] : []),
   ]
   const moreTask = sortedTasks.find(t => t.id === moreTaskId) ?? null
-  const toggleDone = (id: string, status: string) =>
-    updateTask.mutate({ id, status: status === 'done' ? 'todo' : 'done' })
+  // Every status change here opens a 6 s window: "Deshacer" (or ⌘Z) restores the previous status.
+  const setStatusUndoable = (task: { id: string; title: string; status: string }, next: TaskStatus) =>
+    changeStatusWithUndo({
+      title: task.title,
+      from: task.status,
+      to: next,
+      apply: st => updateTask.mutate({ id: task.id, status: st as TaskStatus }),
+    })
+  const toggleDone = (task: { id: string; title: string; status: string }) =>
+    setStatusUndoable(task, task.status === 'done' ? 'todo' : 'done')
+
+  // Keyboard (desktop table): j / k move a ring, x completes, Enter or e opens the project.
+  const router = useRouter()
+  const isMobile = useIsMobile()
+  const { focusedId, rowProps } = useListNavigation(sortedTasks, {
+    onToggle: toggleDone,
+    onOpen: task => {
+      const p = task.project as { id: string } | null
+      if (p) router.push(`/dashboard/projects/${p.id}`)
+    },
+  }, !isMobile)
 
   return (
     <>
@@ -243,7 +270,7 @@ export function TasksOverview() {
                 const p = task.project as { id: string } | null
                 if (p) setDetail({ id: task.id, projectId: p.id })
               }}
-              onToggleDone={() => toggleDone(task.id, task.status)}
+              onToggleDone={() => toggleDone(task)}
               onMore={() => setMoreTaskId(task.id)}
             />
           ))}
@@ -268,7 +295,7 @@ export function TasksOverview() {
         onClose={() => setMoreTaskId(null)}
         title={moreTask?.title ?? ''}
         status={moreTask?.status}
-        onStatus={st => moreTask && updateTask.mutate({ id: moreTask.id, status: st })}
+        onStatus={st => moreTask && setStatusUndoable(moreTask, st)}
       >
         {(moreTask?.project as { id: string } | null | undefined) && (
           <InsetGroup>
@@ -471,7 +498,8 @@ export function TasksOverview() {
               return (
                 <div
                   key={task.id}
-                  className={`group transition-colors ${isSelected ? 'bg-signal-wash dark:bg-signal/30' : 'hover:bg-mist dark:hover:bg-night-700/40'}`}
+                  {...rowProps(task.id)}
+                  className={`group cv-auto-row-lg transition-colors ${isSelected ? 'bg-signal-wash dark:bg-signal/30' : 'hover:bg-mist dark:hover:bg-night-700/40'} ${focusedId === task.id ? ROW_FOCUS_RING : ''}`}
                 >
                   {/* ─── MOBILE LAYOUT (< md) — vertical card, tappable ─── */}
                   <Link
@@ -512,7 +540,7 @@ export function TasksOverview() {
                         <div className="mt-2 flex items-center gap-2" onClick={e => e.preventDefault()}>
                           <Select
                             value={task.status}
-                            onValueChange={val => updateTask.mutate({ id: task.id, status: val as TaskStatus })}
+                            onValueChange={val => setStatusUndoable(task, val as TaskStatus)}
                           >
                             <SelectTrigger className="h-7 w-32 text-[11px]" onClick={e => e.preventDefault()}>
                               <SelectValue />
@@ -576,7 +604,7 @@ export function TasksOverview() {
                     <div className="w-32">
                       <Select
                         value={task.status}
-                        onValueChange={val => updateTask.mutate({ id: task.id, status: val as TaskStatus })}
+                        onValueChange={val => setStatusUndoable(task, val as TaskStatus)}
                       >
                         <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
                         <SelectContent>

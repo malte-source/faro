@@ -40,7 +40,7 @@ export default async function PrintPage({ params }: { params: Promise<{ id: stri
     .select(`
       *,
       department:departments(id, name, color),
-      workspace:workspaces!inner(id, name, org_id)
+      workspace:workspaces!projects_workspace_id_fkey!inner(id, name, org_id)
     `)
     .eq('id', id)
     .eq('workspace.org_id', me.org_id)
@@ -56,7 +56,7 @@ export default async function PrintPage({ params }: { params: Promise<{ id: stri
 
   const { data: members } = await supabase
     .from('project_members')
-    .select('id, role, user:users(id, name, email, position)')
+    .select('id, role, user:users!project_members_user_id_fkey(id, name, email, position)')
     .eq('project_id', id)
     .is('removed_at', null)
 

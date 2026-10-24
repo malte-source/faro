@@ -6,7 +6,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { Building2, ChevronDown, ChevronLeft, Search, User } from 'lucide-react'
 import { trpc } from '@/lib/trpc/client'
 import { useMobileChrome } from '@/stores/mobile-chrome'
-import { openCommandPalette } from '@/components/command/command-palette'
+import { openSearch } from '@/components/search/search-sheet'
 import { NotificationsPanel } from '@/components/notifications/notifications-panel'
 import { WorkspaceSheet } from '@/components/mobile/workspace-sheet'
 import { cn } from '@/lib/utils'
@@ -84,7 +84,7 @@ export function MobileNavBar({ title, actions }: { title: string; actions?: Reac
         </span>
 
         <div className="flex shrink-0 items-center">
-          <button type="button" onClick={openCommandPalette} className="flex h-10 w-10 items-center justify-center rounded-full text-foreground active:bg-border-soft" aria-label="Buscar">
+          <button type="button" onClick={() => openSearch()} className="flex h-10 w-10 items-center justify-center rounded-full text-foreground active:bg-border-soft" aria-label="Buscar">
             <Search className="h-[22px] w-[22px]" />
           </button>
           <NotificationsPanel placement="sheet" />

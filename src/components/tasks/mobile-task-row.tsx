@@ -137,7 +137,7 @@ export function MobileTaskRow({
     </div>
   )
 
-  return selectMode ? body : <SwipeRow actions={actions}>{body}</SwipeRow>
+  return selectMode ? body : <SwipeRow actions={actions} className="cv-auto-row">{body}</SwipeRow>
 }
 
 /** Rounded card that holds task rows, with hairline separators. */

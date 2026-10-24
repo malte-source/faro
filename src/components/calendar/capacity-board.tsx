@@ -125,7 +125,7 @@ function TasksView() {
                     <div className="flex items-center gap-2">
                       {u.avatar_url ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={u.avatar_url} alt="" className="h-6 w-6 rounded-full" />
+                        <img src={u.avatar_url} alt="" loading="lazy" decoding="async" className="h-6 w-6 rounded-full" />
                       ) : (
                         <span className="flex h-6 w-6 items-center justify-center rounded-full bg-stone-100 text-[10px] font-semibold text-graphite dark:bg-ink-body">
                           {(u.name ?? '?').slice(0, 2).toUpperCase()}
@@ -238,7 +238,7 @@ function MeetingsView() {
                   <div className="flex items-center gap-2">
                     {u.avatar_url ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={u.avatar_url} alt="" className="h-6 w-6 rounded-full" />
+                      <img src={u.avatar_url} alt="" loading="lazy" decoding="async" className="h-6 w-6 rounded-full" />
                     ) : (
                       <span className="flex h-6 w-6 items-center justify-center rounded-full bg-stone-100 text-[10px] font-semibold text-graphite dark:bg-ink-body">
                         {(u.name ?? '?').slice(0, 2).toUpperCase()}

@@ -53,6 +53,7 @@ import { Video } from 'lucide-react'
 import { WorkspaceSwitcher } from '@/components/layout/workspace-switcher'
 import { FaroMark } from '@/components/brand/logo'
 import { trpc } from '@/lib/trpc/client'
+import { useChatUnreadTotal } from '@/components/chat/hooks'
 
 // Grouped nav. Each group has an optional `header` (the first/primary
 // group has none — those are the everyday drivers). Grouping separates
@@ -116,6 +117,7 @@ const groupNavItems: { href: string; label: string; icon: typeof LayoutDashboard
   { href: '/dashboard/personas',  label: 'Personas',  icon: Users,         tooltip: 'Quién trabaja dónde y con qué carga' },
   { href: '/dashboard/grupo',     label: 'Grupo',     icon: Building2,     tooltip: 'Vista de Dirección: todas las empresas', direction: true },
   { href: '/dashboard/costos',    label: 'Costos',    icon: Landmark,      tooltip: 'Reparto de costos del holding a las filiales (Dirección)', direction: true },
+  { href: '/dashboard/ia',        label: 'Uso de IA', icon: Gauge,         tooltip: 'Gasto de IA del mes y presupuesto (Dirección)', direction: true },
 ]
 
 interface SidebarProps {
@@ -135,12 +137,7 @@ export function Sidebar({ userName, userEmail, userAvatar }: SidebarProps) {
   const { data: me } = trpc.membership.me.useQuery(undefined, { staleTime: 60_000 })
   const { data: counts } = trpc.inbox.counts.useQuery(undefined, { staleTime: 30_000, enabled: !!me?.groupMode })
   const groupMode = me?.groupMode ?? false
-  const { data: chatUnread } = trpc.chat.unreadTotal.useQuery(undefined, {
-    enabled: !!me?.isTeam,
-    refetchInterval: 20_000,
-    retry: false,
-    staleTime: 10_000,
-  })
+  const { data: chatUnread } = useChatUnreadTotal(!!me?.isTeam)
 
   const nextTheme = () => {
     if (theme === 'light') setTheme('dark')

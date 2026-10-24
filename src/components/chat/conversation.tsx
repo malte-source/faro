@@ -10,7 +10,7 @@ import { confirmAction } from '@/components/ui/confirm'
 import { toast } from '@/components/ui/toaster'
 import { Composer } from '@/components/chat/composer'
 import { ExtractTasksButton } from '@/components/chat/extract-tasks-button'
-import { usePageVisible, useMe, useSendMessage } from '@/components/chat/hooks'
+import { useChannelMessages, usePageVisible, useMe, useSendMessage } from '@/components/chat/hooks'
 import { MessageList } from '@/components/chat/message-list'
 import { Popover } from '@/components/chat/popover'
 import { RichText } from '@/components/chat/rich-text'
@@ -50,10 +50,7 @@ export function Conversation({
   const visible = usePageVisible()
   const utils = trpc.useUtils()
 
-  const query = trpc.chat.messages.useQuery(
-    { channelId },
-    { refetchInterval: visible ? 3000 : false, refetchIntervalInBackground: false, retry: 1 },
-  )
+  const query = useChannelMessages(channelId)
   const data = query.data
   const isMember = data?.channel.isMember ?? false
   const sendApi = useSendMessage({ channelId })

@@ -10,10 +10,17 @@ import {
   CalendarDays, BarChart3, Users, Settings, Plus, LogOut,
   ArrowRight, FolderOpen, Hash,
   LayoutGrid, GanttChartSquare, CalendarCheck, Flame, Zap, Repeat, Gauge,
+  MessagesSquare, FileText, Building2, Landmark, Sparkles, Keyboard, SunMoon,
 } from 'lucide-react'
+import { useTheme } from 'next-themes'
 import { PROJECT_STATUS, PRIORITY } from '@/lib/utils'
 import type { TaskStatus } from '@/types/database'
 import { signOutAndClear } from '@/lib/sign-out'
+import { openSearch } from '@/components/search/search-sheet'
+import { buildCatalog, hintFor } from '@/components/shortcuts/catalog'
+import { fuzzyScoreAny } from '@/components/shortcuts/fuzzy'
+import { createTask, createTaskWithAI } from '@/components/shortcuts/actions'
+import { openShortcutsHelp } from '@/components/shortcuts/shortcuts-store'
 import { cn } from '@/lib/utils'
 
 const TASK_STATUS_LABEL: Record<TaskStatus, string> = {
@@ -51,6 +58,11 @@ export function CommandPalette() {
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
+  const { data: me } = trpc.membership.me.useQuery(undefined, { staleTime: 60_000 })
+  const { theme, setTheme } = useTheme()
+  const isGroup = me?.groupMode ?? false
+  const isDirection = me?.isDirection ?? false
+  const isTeam = me?.isTeam ?? false
 
   // Debounce search query
   useEffect(() => {
@@ -58,34 +70,44 @@ export function CommandPalette() {
     return () => clearTimeout(t)
   }, [query])
 
+  // Every way of opening starts from a clean slate (empty query, first row selected).
+  const openFresh = useCallback(() => {
+    setQuery('')
+    setDebouncedQuery('')
+    setSelectedIndex(0)
+    setOpen(true)
+  }, [])
+
   // Open via global event
   useEffect(() => {
-    const handler = () => { setOpen(true) }
-    window.addEventListener(PALETTE_EVENT, handler)
-    return () => window.removeEventListener(PALETTE_EVENT, handler)
-  }, [])
+    window.addEventListener(PALETTE_EVENT, openFresh)
+    return () => window.removeEventListener(PALETTE_EVENT, openFresh)
+  }, [openFresh])
 
   // Keyboard shortcut: Cmd/Ctrl+K
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault()
-        setOpen(v => !v)
+        if (open) setOpen(false)
+        else openFresh()
       }
     }
     document.addEventListener('keydown', handler)
     return () => document.removeEventListener('keydown', handler)
-  }, [])
+  }, [open, openFresh])
 
   // Focus input on open
   useEffect(() => {
-    if (open) {
-      setSelectedIndex(0)
-      setTimeout(() => inputRef.current?.focus(), 40)
-    } else {
-      setQuery('')
-      setDebouncedQuery('')
-    }
+    if (!open) return
+    const t = setTimeout(() => inputRef.current?.focus(), 40)
+    return () => clearTimeout(t)
+  }, [open])
+
+  useEffect(() => {
+    if (!open) return
+    document.body.dataset.paletteOpen = ''
+    return () => { delete document.body.dataset.paletteOpen }
   }, [open])
 
   function close() { setOpen(false) }
@@ -95,30 +117,58 @@ export function CommandPalette() {
     router.push(href)
   }
 
-  /* static commands */
-  const staticCommands = useMemo<CommandItem[]>(() => [
-    // Navigation
-    { id: 'nav-dashboard', label: 'Dashboard', description: 'Vista general', icon: <LayoutDashboard className="h-4 w-4" />, action: () => navigate('/dashboard'), group: 'Navegar', shortcut: 'G D' },
-    { id: 'nav-projects', label: 'Proyectos', description: 'Lista de proyectos', icon: <FolderKanban className="h-4 w-4" />, action: () => navigate('/dashboard/projects'), group: 'Navegar', shortcut: 'G P' },
-    { id: 'nav-kanban', label: 'Kanban', description: 'Portafolio por etapa', icon: <Kanban className="h-4 w-4" />, action: () => navigate('/dashboard/kanban'), group: 'Navegar', shortcut: 'G K' },
-    { id: 'nav-tasks', label: 'Tareas', description: 'Todas las tareas', icon: <CheckSquare className="h-4 w-4" />, action: () => navigate('/dashboard/tasks'), group: 'Navegar', shortcut: 'G T' },
-    { id: 'nav-calendar', label: 'Calendario', description: 'Vista de calendario', icon: <CalendarDays className="h-4 w-4" />, action: () => navigate('/dashboard/calendar'), group: 'Navegar' },
-    { id: 'nav-eisenhower', label: 'Matriz Eisenhower', description: 'Urgente vs Importante', icon: <LayoutGrid className="h-4 w-4" />, action: () => navigate('/dashboard/eisenhower'), group: 'Navegar' },
-    { id: 'nav-gantt', label: 'Gantt', description: 'Timeline de proyectos', icon: <GanttChartSquare className="h-4 w-4" />, action: () => navigate('/dashboard/gantt'), group: 'Navegar' },
-    { id: 'nav-today', label: 'Mi día', description: 'Tus tareas de hoy', icon: <CalendarCheck className="h-4 w-4" />, action: () => navigate('/dashboard/today'), group: 'Navegar' },
-    { id: 'nav-priorities', label: 'Prioridades', description: 'Lo más urgente del equipo', icon: <Flame className="h-4 w-4" />, action: () => navigate('/dashboard/priorities'), group: 'Navegar' },
-    { id: 'nav-automations', label: 'Automatizaciones', description: 'Reglas si-esto-entonces-aquello', icon: <Zap className="h-4 w-4" />, action: () => navigate('/dashboard/automations'), group: 'Navegar' },
-    { id: 'nav-recurring', label: 'Recurrentes', description: 'Tareas que se materializan automáticamente', icon: <Repeat className="h-4 w-4" />, action: () => navigate('/dashboard/recurring'), group: 'Navegar' },
-    { id: 'nav-capacity', label: 'Capacidad del equipo', description: 'Carga real por persona', icon: <Gauge className="h-4 w-4" />, action: () => navigate('/dashboard/capacity'), group: 'Navegar' },
-    { id: 'nav-reports', label: 'Reportes', description: 'Métricas y analytics', icon: <BarChart3 className="h-4 w-4" />, action: () => navigate('/dashboard/reports'), group: 'Navegar' },
-    { id: 'nav-team', label: 'Equipo', description: 'Gestión del equipo', icon: <Users className="h-4 w-4" />, action: () => navigate('/dashboard/team'), group: 'Navegar' },
-    { id: 'nav-settings', label: 'Configuración', description: 'Ajustes de la cuenta', icon: <Settings className="h-4 w-4" />, action: () => navigate('/dashboard/settings'), group: 'Navegar' },
-    // Actions
-    { id: 'act-new-task', label: 'Nueva tarea', description: 'Crear una tarea rápida', icon: <Plus className="h-4 w-4" />, action: () => { close(); window.dispatchEvent(new KeyboardEvent('keydown', { key: 'n', bubbles: true })) }, group: 'Acciones', shortcut: 'N' },
-    { id: 'act-new-project', label: 'Nuevo proyecto', description: 'Crear un proyecto', icon: <FolderOpen className="h-4 w-4" />, action: () => navigate('/dashboard/projects?new=1'), group: 'Acciones' },
-    { id: 'act-logout', label: 'Cerrar sesión', description: 'Salir de Faro', icon: <LogOut className="h-4 w-4" />, action: async () => { close(); await signOutAndClear() }, group: 'Acciones' },
+  /* static commands — shortcut hints come from the same catalog that binds the keys */
+  const catalog = useMemo(() => buildCatalog({ groupMode: isGroup }), [isGroup])
+  const themeName = (theme ?? 'system') as 'light' | 'dark' | 'system'
+  const nextTheme = themeName === 'light' ? 'dark' : themeName === 'dark' ? 'system' : 'light'
+  const THEME_LABEL = { light: 'claro', dark: 'oscuro', system: 'del sistema' } as const
+
+  const staticCommands = useMemo<CommandItem[]>(() => {
+    const hint = (id: string) => hintFor(catalog, id)
+    const nav = (id: string, label: string, description: string, icon: React.ReactNode, href: string, hintId?: string): CommandItem =>
+      ({ id, label, description, icon, action: () => navigate(href), group: 'Navegar', shortcut: hintId ? hint(hintId) : undefined })
+    const ic = 'h-4 w-4'
+    return [
+      // Navigation
+      isGroup
+        ? nav('nav-home', 'Hoy', 'Todas tus tareas, de todas tus empresas', <CalendarCheck className={ic} />, '/dashboard/hoy', 'nav-home')
+        : nav('nav-home', 'Inicio', 'Vista general', <LayoutDashboard className={ic} />, '/dashboard', 'nav-home'),
+      nav('nav-projects', 'Proyectos', 'Lista de proyectos', <FolderKanban className={ic} />, '/dashboard/projects', 'nav-projects'),
+      nav('nav-tasks', 'Tareas', 'Todas las tareas', <CheckSquare className={ic} />, '/dashboard/tasks', 'nav-tasks'),
+      ...(isTeam ? [nav('nav-chat', 'Chat', 'Canales y mensajes directos', <MessagesSquare className={ic} />, '/dashboard/chat', 'nav-chat')] : []),
+      nav('nav-docs', 'Documentos', 'Políticas, manuales, SOPs y actas', <FileText className={ic} />, '/dashboard/documentos', 'nav-docs'),
+      isGroup
+        ? nav('nav-people', 'Personas', 'Quién trabaja dónde y con qué carga', <Users className={ic} />, '/dashboard/personas', 'nav-people')
+        : nav('nav-people', 'Equipo', 'Gestión del equipo', <Users className={ic} />, '/dashboard/team', 'nav-people'),
+      ...(isGroup ? [nav('nav-capture', 'Capturar', 'Audio, foto, video o texto → tareas', <Sparkles className={ic} />, '/dashboard/capturar')] : []),
+      ...(isGroup && isDirection
+        ? [
+            nav('nav-group', 'Grupo', 'Vista de Dirección: todas las empresas', <Building2 className={ic} />, '/dashboard/grupo'),
+            nav('nav-costs', 'Costos', 'Reparto del holding a las filiales', <Landmark className={ic} />, '/dashboard/costos'),
+          ]
+        : []),
+      nav('nav-kanban', 'Kanban', 'Portafolio por etapa', <Kanban className={ic} />, '/dashboard/kanban', 'nav-kanban'),
+      nav('nav-calendar', 'Calendario', 'Vista de calendario', <CalendarDays className={ic} />, '/dashboard/calendar'),
+      nav('nav-eisenhower', 'Matriz Eisenhower', 'Urgente vs Importante', <LayoutGrid className={ic} />, '/dashboard/eisenhower'),
+      nav('nav-gantt', 'Gantt', 'Timeline de proyectos', <GanttChartSquare className={ic} />, '/dashboard/gantt'),
+      ...(!isGroup ? [nav('nav-today', 'Mi día', 'Tus tareas de hoy', <CalendarCheck className={ic} />, '/dashboard/today')] : []),
+      nav('nav-priorities', 'Prioridades', 'Lo más urgente del equipo', <Flame className={ic} />, '/dashboard/priorities'),
+      nav('nav-automations', 'Automatizaciones', 'Reglas si-esto-entonces-aquello', <Zap className={ic} />, '/dashboard/automations'),
+      nav('nav-recurring', 'Recurrentes', 'Tareas que se materializan automáticamente', <Repeat className={ic} />, '/dashboard/recurring'),
+      nav('nav-capacity', 'Capacidad del equipo', 'Carga real por persona', <Gauge className={ic} />, '/dashboard/capacity'),
+      nav('nav-reports', 'Reportes', 'Métricas y analytics', <BarChart3 className={ic} />, '/dashboard/reports'),
+      ...(isGroup ? [nav('nav-team', 'Equipo y organigrama', 'Miembros, áreas y líneas de reporte', <Users className={ic} />, '/dashboard/team')] : []),
+      nav('nav-settings', 'Configuración', 'Ajustes de la cuenta', <Settings className={ic} />, '/dashboard/settings', 'nav-settings'),
+      // Actions
+      { id: 'act-new-task', label: 'Nueva tarea', description: 'Crear una tarea rápida', icon: <Plus className={ic} />, action: () => { close(); createTask() }, group: 'Acciones', shortcut: hint('create') },
+      { id: 'act-new-task-ai', label: 'Nueva tarea con IA', description: 'Describe la tarea y Faro la arma', icon: <Sparkles className={ic} />, action: () => { close(); createTaskWithAI() }, group: 'Acciones', shortcut: hint('create-ai') },
+      { id: 'act-new-project', label: 'Nuevo proyecto', description: 'Crear un proyecto', icon: <FolderOpen className={ic} />, action: () => navigate('/dashboard/projects?new=1'), group: 'Acciones' },
+      { id: 'act-shortcuts', label: 'Ver atajos de teclado', description: 'Todos los atajos de Faro', icon: <Keyboard className={ic} />, action: () => { close(); openShortcutsHelp() }, group: 'Acciones', shortcut: hint('help') },
+      { id: 'act-theme', label: 'Cambiar tema', description: `Ahora: ${THEME_LABEL[themeName]} · siguiente: ${THEME_LABEL[nextTheme]}`, icon: <SunMoon className={ic} />, action: () => { setTheme(nextTheme); close() }, group: 'Acciones' },
+      { id: 'act-logout', label: 'Cerrar sesión', description: 'Salir de Faro', icon: <LogOut className={ic} />, action: async () => { close(); await signOutAndClear() }, group: 'Acciones' },
+    ]
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  ], [])
+  }, [catalog, isGroup, isDirection, isTeam, themeName])
 
   const isSearching = debouncedQuery.trim().length >= 2
   const { data: searchData, isFetching } = trpc.search.global.useQuery(
@@ -126,13 +176,15 @@ export function CommandPalette() {
     { enabled: isSearching, staleTime: 10_000 }
   )
 
-  /* filtered static items */
+  /* filtered static items — accent-insensitive fuzzy match, best first (stable for equal scores) */
   const filteredStatic = useMemo(() => {
-    if (!query.trim()) return staticCommands
-    const q = query.toLowerCase()
-    return staticCommands.filter(
-      c => c.label.toLowerCase().includes(q) || c.description?.toLowerCase().includes(q)
-    )
+    const q = query.trim()
+    if (!q) return staticCommands
+    return staticCommands
+      .map((c, i) => ({ c, i, score: fuzzyScoreAny(q, [c.label, c.description, c.group]) }))
+      .filter(x => x.score > 0)
+      .sort((a, b) => b.score - a.score || a.i - b.i)
+      .map(x => x.c)
   }, [query, staticCommands])
 
   /* all items to render in order */
@@ -164,9 +216,21 @@ export function CommandPalette() {
       }
     }
 
+    if (isSearching) {
+      const q = debouncedQuery.trim()
+      items.push({
+        id: 'search-all',
+        label: `Buscar «${q}» en todo`,
+        description: 'Tareas, documentos, chat y decisiones — por texto y por significado',
+        icon: <Search className="h-4 w-4" />,
+        action: () => { close(); openSearch(q) },
+        group: 'Buscar',
+      })
+    }
+
     return items
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filteredStatic, isSearching, searchData])
+  }, [filteredStatic, isSearching, searchData, debouncedQuery])
 
   /* group them */
   const groupedItems = useMemo(() => {
@@ -199,7 +263,6 @@ export function CommandPalette() {
 
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, allItems, selectedIndex])
 
   // Scroll selected item into view
@@ -208,44 +271,6 @@ export function CommandPalette() {
     const el = listRef.current.querySelector('[data-selected="true"]')
     el?.scrollIntoView({ block: 'nearest' })
   }, [selectedIndex])
-
-  // Reset selection when items change
-  useEffect(() => {
-    setSelectedIndex(0)
-  }, [query])
-
-  // Global 'G + key' shortcuts (only when palette is closed and not in input)
-  useEffect(() => {
-    let gPressed = false
-    let gTimer: ReturnType<typeof setTimeout>
-
-    const handler = (e: KeyboardEvent) => {
-      const tag = (e.target as HTMLElement).tagName
-      const isInput = tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement).isContentEditable
-      if (isInput || open) return
-
-      if (e.key === 'g' || e.key === 'G') {
-        gPressed = true
-        gTimer = setTimeout(() => { gPressed = false }, 800)
-        return
-      }
-
-      if (gPressed) {
-        clearTimeout(gTimer)
-        gPressed = false
-        const map: Record<string, string> = {
-          d: '/dashboard', p: '/dashboard/projects',
-          k: '/dashboard/kanban', t: '/dashboard/tasks',
-        }
-        const dest = map[e.key.toLowerCase()]
-        if (dest) { e.preventDefault(); router.push(dest) }
-      }
-    }
-
-    document.addEventListener('keydown', handler)
-    return () => document.removeEventListener('keydown', handler)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open])
 
   if (!open) return null
 
@@ -268,7 +293,7 @@ export function CommandPalette() {
           <input
             ref={inputRef}
             value={query}
-            onChange={e => setQuery(e.target.value)}
+            onChange={e => { setQuery(e.target.value); setSelectedIndex(0) }}
             placeholder="Buscar o escribir un comando…"
             className="flex-1 bg-transparent text-sm text-night outline-none placeholder:text-graphite dark:text-stone-100 dark:placeholder:text-graphite"
           />
@@ -284,7 +309,7 @@ export function CommandPalette() {
         <div ref={listRef} className="max-h-[420px] overflow-y-auto py-1">
           {allItems.length === 0 && (
             <div className="flex flex-col items-center justify-center gap-1.5 py-10 text-graphite dark:text-graphite">
-              <p className="text-sm">Sin resultados para <strong>"{query}"</strong></p>
+              <p className="text-sm">Sin resultados para <strong>&quot;{query}&quot;</strong></p>
             </div>
           )}
 
@@ -373,7 +398,7 @@ export function CommandPalette() {
               seleccionar
             </span>
             <span className="hidden sm:flex items-center gap-1">
-              <kbd className="rounded border border-stone bg-stone-100 px-1.5 dark:border-ink-body dark:bg-night-700">G</kbd>+<kbd className="rounded border border-stone bg-stone-100 px-1.5 dark:border-ink-body dark:bg-night-700">D/P/K/T</kbd>
+              <kbd className="rounded border border-stone bg-stone-100 px-1.5 dark:border-ink-body dark:bg-night-700">G</kbd><span>luego</span><kbd className="rounded border border-stone bg-stone-100 px-1.5 dark:border-ink-body dark:bg-night-700">H P T C D</kbd>
               ir a
             </span>
           </div>

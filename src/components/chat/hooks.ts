@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { trpc } from '@/lib/trpc/client'
 import { toast } from '@/components/ui/toaster'
+import { deltaCursor, mergeById } from '@/lib/chat-merge'
+import { FULL_REFRESH_MS, IDLE_POLL_MS, UNREAD_TOTAL_POLL_MS, pickPollInterval } from '@/lib/chat-polling'
 import type { Directory, DirectoryPerson, PendingMessage } from '@/components/chat/types'
 
 /** True while the tab is visible — polling pauses in background tabs. */
@@ -15,6 +17,162 @@ export function usePageVisible(): boolean {
     () => document.visibilityState === 'visible',
     () => true,
   )
+}
+
+// ── Adaptive, incremental polling ───────────────────────────────────────────────────────────────────
+//
+// An open conversation used to re-download its 60 latest messages every 3 s, always. Now:
+//  • it asks only for what changed since the previous answer (`after` cursor) and merges by id;
+//  • it polls every 3 s while you are using the window, every 8 s when idle, and not at all in a
+//    hidden tab or offline (an immediate poll runs when you come back);
+//  • a slow full refetch (60 s) repairs what a delta cannot show, such as a removed reaction.
+
+let lastActivityAt = typeof Date !== 'undefined' ? Date.now() : 0
+let activityListening = false
+
+/** One shared, throttled listener: "has the user touched the window recently?" feeds the poll interval. */
+function ensureActivityListeners() {
+  if (activityListening || typeof window === 'undefined') return
+  activityListening = true
+  let last = 0
+  const bump = () => {
+    const now = Date.now()
+    if (now - last > 1000) { last = now; lastActivityAt = now }
+  }
+  for (const ev of ['pointerdown', 'pointermove', 'keydown', 'touchstart', 'wheel'] as const) {
+    window.addEventListener(ev, bump, { passive: true, capture: true })
+  }
+}
+
+/**
+ * Runs `run` on an adaptive timer (see chat-polling.ts) and immediately on focus / `online` /
+ * becoming visible. Calls never overlap. `run` may be a new closure on every render.
+ */
+export function useAdaptivePolling(run: () => Promise<void>, enabled: boolean) {
+  const runRef = useRef(run)
+  useEffect(() => { runRef.current = run })
+
+  useEffect(() => {
+    if (!enabled) return
+    ensureActivityListeners()
+    let stopped = false
+    let inFlight = false
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const context = () => ({
+      visible: document.visibilityState === 'visible',
+      focused: document.hasFocus(),
+      online: navigator.onLine,
+      msSinceActivity: Date.now() - lastActivityAt,
+    })
+    const schedule = () => {
+      if (stopped) return
+      clearTimeout(timer)
+      const ms = pickPollInterval(context())
+      timer = setTimeout(fire, ms === false ? IDLE_POLL_MS : ms) // paused → just re-check later
+    }
+    const fire = async () => {
+      if (stopped) return
+      if (pickPollInterval(context()) !== false && !inFlight) {
+        inFlight = true
+        try { await runRef.current() } catch { /* transient: the next tick retries */ } finally { inFlight = false }
+      }
+      schedule()
+    }
+    const wake = () => {
+      if (document.visibilityState !== 'visible') return
+      clearTimeout(timer)
+      void fire()
+    }
+    window.addEventListener('focus', wake)
+    window.addEventListener('online', wake)
+    document.addEventListener('visibilitychange', wake)
+    schedule()
+    return () => {
+      stopped = true
+      clearTimeout(timer)
+      window.removeEventListener('focus', wake)
+      window.removeEventListener('online', wake)
+      document.removeEventListener('visibilitychange', wake)
+    }
+  }, [enabled])
+}
+
+/**
+ * The open channel's first page, kept fresh with cheap deltas. Returns the base query so callers
+ * keep using `isLoading`, `error`, `refetch` and `data` exactly as before.
+ */
+export function useChannelMessages(channelId: string) {
+  const utils = trpc.useUtils()
+  const visible = usePageVisible()
+  const query = trpc.chat.messages.useQuery(
+    { channelId },
+    { retry: 1, refetchInterval: visible ? FULL_REFRESH_MS : false, refetchIntervalInBackground: false, refetchOnWindowFocus: false },
+  )
+  const cursor = useRef<string | null>(null)
+  const asOf = query.data?.asOf ?? null
+  useEffect(() => { if (asOf) cursor.current = asOf }, [asOf])
+
+  const run = useCallback(async () => {
+    const since = cursor.current
+    if (!since) return
+    const res = await utils.client.chat.messages.query({ channelId, after: deltaCursor(since) })
+    if (res.reset) { await utils.chat.messages.invalidate({ channelId }); return }
+    cursor.current = res.asOf
+    if (res.messages.length === 0) return
+    // Keep the very same cached object when the delta only re-sent rows we already hold (the overlap
+    // window does this on every poll): no new reference → no re-render of the whole conversation.
+    utils.chat.messages.setData({ channelId }, old => {
+      if (!old) return old
+      const messages = mergeById(old.messages, res.messages)
+      if (messages === old.messages && JSON.stringify(old.channel) === JSON.stringify(res.channel)) return old
+      return { ...old, channel: res.channel, messages, asOf: res.asOf }
+    })
+  }, [utils, channelId])
+
+  useAdaptivePolling(run, asOf !== null)
+  return query
+}
+
+/** Same idea for an open thread: the root is replaced, only changed replies are merged. */
+export function useThreadMessages(parentId: string) {
+  const utils = trpc.useUtils()
+  const visible = usePageVisible()
+  const query = trpc.chat.thread.useQuery(
+    { parentId },
+    { retry: 1, refetchInterval: visible ? FULL_REFRESH_MS : false, refetchIntervalInBackground: false, refetchOnWindowFocus: false },
+  )
+  const cursor = useRef<string | null>(null)
+  const asOf = query.data?.asOf ?? null
+  useEffect(() => { if (asOf) cursor.current = asOf }, [asOf])
+
+  const run = useCallback(async () => {
+    const since = cursor.current
+    if (!since) return
+    const res = await utils.client.chat.thread.query({ parentId, after: deltaCursor(since) })
+    if (res.reset) { await utils.chat.thread.invalidate({ parentId }); return }
+    cursor.current = res.asOf
+    utils.chat.thread.setData({ parentId }, old => {
+      if (!old) return old
+      const replies = mergeById(old.replies, res.replies)
+      if (replies === old.replies && JSON.stringify(old.root) === JSON.stringify(res.root)) return old
+      return { ...old, root: res.root, replies, asOf: res.asOf }
+    })
+  }, [utils, parentId])
+
+  useAdaptivePolling(run, asOf !== null)
+  return query
+}
+
+/** Unread badge (sidebar, tab bar): 30 s while visible, plus an immediate refresh when you return to the app. */
+export function useChatUnreadTotal(enabled: boolean) {
+  return trpc.chat.unreadTotal.useQuery(undefined, {
+    enabled,
+    refetchInterval: UNREAD_TOTAL_POLL_MS,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: true,
+    retry: false,
+    staleTime: 10_000,
+  })
 }
 
 /** md breakpoint (768px) — decides between the single-pane (mobile) and three-pane (desktop) layout. */

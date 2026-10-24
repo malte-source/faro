@@ -199,7 +199,7 @@ export function ProjectDrive({ projectId }: Props) {
               >
                 {f.iconLink ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={f.iconLink} alt="" className="h-4 w-4 shrink-0" />
+                  <img src={f.iconLink} alt="" loading="lazy" decoding="async" className="h-4 w-4 shrink-0" />
                 ) : (
                   <FileText className="h-4 w-4 shrink-0 text-graphite" />
                 )}

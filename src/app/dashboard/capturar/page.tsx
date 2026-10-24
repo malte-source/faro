@@ -1,6 +1,6 @@
 import { Suspense } from 'react'
 import { Header } from '@/components/layout/header'
-import { CaptureWorkspace } from '@/components/captura/capture-workspace'
+import { CaptureWorkspace } from '@/components/captura/capture-workspace-lazy'
 
 export default function CapturarPage() {
   return (

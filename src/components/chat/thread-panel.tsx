@@ -2,20 +2,15 @@
 
 import { useEffect, useLayoutEffect, useRef } from 'react'
 import { ChevronLeft, Sparkles, X } from 'lucide-react'
-import { trpc } from '@/lib/trpc/client'
 import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Composer } from '@/components/chat/composer'
 import { ExtractTasksButton } from '@/components/chat/extract-tasks-button'
-import { usePageVisible, useSendMessage, useVisualViewportBox } from '@/components/chat/hooks'
+import { useSendMessage, useThreadMessages, useVisualViewportBox } from '@/components/chat/hooks'
 import { MessageItem, PendingItem } from '@/components/chat/message-item'
 
 function ThreadBody({ channelId, parentId, channelWorkspaceId }: { channelId: string; parentId: string; channelWorkspaceId: string | null }) {
-  const visible = usePageVisible()
-  const query = trpc.chat.thread.useQuery(
-    { parentId },
-    { refetchInterval: visible ? 3000 : false, refetchIntervalInBackground: false, retry: 1 },
-  )
+  const query = useThreadMessages(parentId)
   const sendApi = useSendMessage({ channelId, parentId })
   const scroller = useRef<HTMLDivElement>(null)
   const nearBottom = useRef(true)

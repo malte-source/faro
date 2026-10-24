@@ -151,7 +151,7 @@ export function TaskAttachments({ taskId }: Props) {
             <li key={a.id} className="group flex items-center gap-2 bg-white px-3 py-2 transition hover:bg-mist dark:bg-night dark:hover:bg-night-700">
               {a.icon_link ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={a.icon_link} alt="" className="h-4 w-4 shrink-0" />
+                <img src={a.icon_link} alt="" loading="lazy" decoding="async" className="h-4 w-4 shrink-0" />
               ) : (
                 <FileText className="h-4 w-4 shrink-0 text-graphite" />
               )}

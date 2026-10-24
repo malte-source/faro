@@ -4,7 +4,7 @@ import { DocumentFromTaskButton } from '@/components/documentos/document-from-ta
 import { useState, useEffect } from 'react'
 import { trpc } from '@/lib/trpc/client'
 import { Badge } from '@/components/ui/badge'
-import { confirmAction } from '@/components/ui/confirm'
+import { changeStatusWithUndo, deleteWithUndo } from '@/lib/task-undo'
 import { toast } from '@/components/ui/toaster'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -81,12 +81,34 @@ export function TaskDetailPanel({ taskId, projectId, onClose, queryKey = 'byProj
     onSettled: () => void Promise.all([utils.tasks.invalidate(), utils.projects.invalidate()]),
   })
 
-  const del = trpc.tasks.delete.useMutation({
-    onSuccess: () => {
-      onClose()
-      void Promise.all([utils.tasks.invalidate(), utils.projects.invalidate()])
-    },
-  })
+  // Status changes (incl. completing) apply now; "Deshacer" / ⌘Z restores the previous status.
+  const changeStatus = (next: TaskStatus) => {
+    if (!task) return
+    changeStatusWithUndo({
+      title: task.title,
+      from: task.status,
+      to: next,
+      apply: st => update.mutate({ id: task.id, status: st as TaskStatus }),
+    })
+  }
+
+  // Delete is held back for 6 s with no confirm dialog: the panel closes, the task disappears from
+  // the lists at once, and "Deshacer" cancels the delete. The vanilla client keeps it working if the
+  // user leaves the screen during the window.
+  const removeTask = () => {
+    if (!task) return
+    const { id, title } = task
+    onClose()
+    deleteWithUndo({
+      id,
+      title,
+      commit: async () => {
+        await utils.client.tasks.delete.mutate(id)
+        await Promise.all([utils.tasks.invalidate(), utils.projects.invalidate()])
+      },
+      onCommitError: e => toast.error('No se pudo borrar', e instanceof Error ? e.message : undefined),
+    })
+  }
 
   if (!taskId || !task) return null
 
@@ -97,12 +119,13 @@ export function TaskDetailPanel({ taskId, projectId, onClose, queryKey = 'byProj
         task={task as unknown as DetailTask}
         projectId={projectId}
         onClose={onClose}
-        deleting={del.isPending}
-        onUpdate={patch => update.mutate({ id: task.id, ...patch })}
-        onDelete={async () => {
-          const ok = await confirmAction({ title: `Borrar tarea "${task.title}"`, description: 'No se puede deshacer.', variant: 'destructive' })
-          if (ok) del.mutate(task.id)
+        deleting={false}
+        onUpdate={patch => {
+          const { status, ...rest } = patch
+          if (status) changeStatus(status)
+          if (Object.keys(rest).length) update.mutate({ id: task.id, ...rest })
         }}
+        onDelete={removeTask}
       />
     )
   }
@@ -122,7 +145,7 @@ export function TaskDetailPanel({ taskId, projectId, onClose, queryKey = 'byProj
        *    bottom (much more thumb-friendly than a side drawer on phones).
        *  - The handle (small grey bar at the top) is only shown on mobile as a
        *    UX affordance hinting "swipe down or tap outside to close". */}
-      <div className="fixed inset-x-0 bottom-0 z-50 flex max-h-[90vh] w-full flex-col rounded-t-2xl bg-surface shadow-2xl animate-in slide-in-from-bottom duration-200 md:inset-x-auto md:right-0 md:top-0 md:bottom-0 md:h-full md:max-h-none md:max-w-[400px] md:rounded-none md:slide-in-from-right">
+      <div role="dialog" aria-modal="true" aria-label="Detalle de la tarea" className="fixed inset-x-0 bottom-0 z-50 flex max-h-[90vh] w-full flex-col rounded-t-2xl bg-surface shadow-2xl animate-in slide-in-from-bottom duration-200 md:inset-x-auto md:right-0 md:top-0 md:bottom-0 md:h-full md:max-h-none md:max-w-[400px] md:rounded-none md:slide-in-from-right">
         {/* Mobile drag handle (hidden on desktop) */}
         <div className="flex shrink-0 justify-center pt-2 md:hidden">
           <div className="h-1 w-10 rounded-full bg-stone dark:bg-ink-body" />
@@ -134,11 +157,7 @@ export function TaskDetailPanel({ taskId, projectId, onClose, queryKey = 'byProj
           </Badge>
           <div className="flex items-center gap-1">
             <button
-              onClick={async () => {
-                const ok = await confirmAction({ title: `Borrar tarea "${task.title}"`, description: 'No se puede deshacer.', variant: 'destructive' })
-                if (ok) del.mutate(task.id)
-              }}
-              disabled={del.isPending}
+              onClick={removeTask}
               className="rounded-md p-1.5 text-graphite hover:bg-danger-wash hover:text-danger transition-colors"
               title="Eliminar tarea"
             >
@@ -190,7 +209,7 @@ export function TaskDetailPanel({ taskId, projectId, onClose, queryKey = 'byProj
               <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-graphite">Estado</label>
               <Select
                 value={task.status}
-                onValueChange={val => update.mutate({ id: task.id, status: val as TaskStatus })}
+                onValueChange={val => changeStatus(val as TaskStatus)}
               >
                 <SelectTrigger className="h-8 text-xs">
                   <SelectValue />

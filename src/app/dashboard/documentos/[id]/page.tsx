@@ -1,4 +1,4 @@
-import { DocumentEditor } from '@/components/documentos/document-editor'
+import { DocumentEditor } from '@/components/documentos/document-editor-lazy'
 
 interface Props {
   params: Promise<{ id: string }>

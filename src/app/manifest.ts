@@ -87,16 +87,20 @@ export default function manifest(): MetadataRoute.Manifest {
       },
     ],
 
-    // Receive shared text / image / audio from other apps → opens FARO's
-    // Magic Quick Add so the user can convert the share into a task in one
-    // step.  Android shows FARO in the share sheet for matching MIME types.
+    // "Compartir → Faro" from any Android app: text, links, voice notes, photos and
+    // video go straight to Captura (POST multipart; the route creates the capture and
+    // redirects to the review screen). Android Chrome only: iOS has no share_target.
+    // Changing share_target does not need a new `id`: installed apps pick it up when
+    // Chrome refreshes the manifest (within about a day).
     share_target: {
-      action: '/dashboard/today',
-      method: 'GET',
+      action: '/dashboard/capturar/compartir',
+      method: 'POST',
+      enctype: 'multipart/form-data',
       params: {
         title: 'title',
         text: 'text',
         url: 'url',
+        files: [{ name: 'media', accept: ['audio/*', 'image/*', 'video/*'] }],
       },
     },
 

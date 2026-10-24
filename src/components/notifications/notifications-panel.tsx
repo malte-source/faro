@@ -1,11 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { trpc } from '@/lib/trpc/client'
-import { Bell, AlertCircle, Clock, Calendar, X, ChevronRight } from 'lucide-react'
+import { Bell, AlertCircle, Clock, Calendar, X, ChevronRight, CheckCheck } from 'lucide-react'
 import { formatDate, daysUntil } from '@/lib/utils'
 import { ScrollFade } from '@/components/ui/scroll-fade'
+import { NotificationItem, groupByDay, type InboxItem } from '@/components/notifications/notification-item'
 
 export function NotificationsPanel({ placement = 'sidebar' }: { placement?: 'sidebar' | 'sheet' } = {}) {
   const sheet = placement === 'sheet'
@@ -16,7 +17,37 @@ export function NotificationsPanel({ placement = 'sidebar' }: { placement?: 'sid
     staleTime: 30_000,
   })
 
-  const totalCount = data?.totalCount ?? 0
+  // Persisted events (assigned, mentioned, asked to review…) — newest page only; the full list lives in /dashboard/bandeja.
+  const utils = trpc.useUtils()
+  const { data: inbox } = trpc.notifications.inbox.useQuery(undefined, { refetchInterval: 45_000, staleTime: 20_000, retry: false })
+  const { data: unread = 0 } = trpc.notifications.unreadCount.useQuery(undefined, { refetchInterval: 45_000, staleTime: 20_000, retry: false })
+  const markRead = trpc.notifications.markRead.useMutation({
+    onSuccess: () => {
+      void utils.notifications.unreadCount.invalidate()
+      void utils.notifications.inbox.invalidate()
+    },
+  })
+  const persisted = useMemo(() => (inbox?.items ?? []) as InboxItem[], [inbox])
+  const grouped = useMemo(() => groupByDay(persisted), [persisted])
+
+  const derivedCount = data?.totalCount ?? 0
+  const totalCount = derivedCount + unread
+
+  // App-icon badge (installed PWA on Android/iOS; harmless elsewhere).
+  useEffect(() => {
+    const nav = navigator as Navigator & { setAppBadge?: (n?: number) => Promise<void>; clearAppBadge?: () => Promise<void> }
+    try {
+      if (unread > 0) void nav.setAppBadge?.(unread)
+      else void nav.clearAppBadge?.()
+    } catch {
+      /* badges are decoration */
+    }
+  }, [unread])
+
+  const openItem = (item: InboxItem) => {
+    if (!item.read) markRead.mutate({ ids: [item.id] })
+    setOpen(false)
+  }
 
   return (
     <div className="relative">
@@ -73,11 +104,42 @@ export function NotificationsPanel({ placement = 'sidebar' }: { placement?: 'sid
                 </div>
               )}
 
-              {!isLoading && totalCount === 0 && (
+              {!isLoading && derivedCount === 0 && persisted.length === 0 && (
                 <div className="flex flex-col items-center justify-center gap-2 py-10">
                   <Bell className="h-8 w-8 text-stone" />
-                  <p className="text-sm font-medium text-green-600">¡Todo al día!</p>
+                  <p className="text-sm font-medium text-success">¡Todo al día!</p>
                   <p className="text-xs text-graphite">No tienes notificaciones pendientes</p>
+                </div>
+              )}
+
+              {/* Persisted events */}
+              {persisted.length > 0 && (
+                <div>
+                  <div className="flex items-center justify-between bg-border-soft px-4 py-2">
+                    <span className="text-xs font-semibold text-foreground">
+                      Novedades{unread > 0 ? ` (${unread} sin leer)` : ''}
+                    </span>
+                    {unread > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => markRead.mutate({ all: true })}
+                        className="flex items-center gap-1 text-[11px] font-medium text-signal-ink"
+                      >
+                        <CheckCheck className="h-3.5 w-3.5" />
+                        Marcar todo como leído
+                      </button>
+                    )}
+                  </div>
+                  {([['Hoy', grouped.today], ['Antes', grouped.earlier]] as const).map(([label, rows]) =>
+                    rows.length === 0 ? null : (
+                      <div key={label}>
+                        <p className="px-4 pb-0.5 pt-2.5 font-mono text-[10px] uppercase tracking-[0.12em] text-graphite">{label}</p>
+                        <div className="divide-y divide-border-soft">
+                          {rows.map(item => <NotificationItem key={item.id} item={item} onOpen={openItem} />)}
+                        </div>
+                      </div>
+                    ),
+                  )}
                 </div>
               )}
 
@@ -194,17 +256,22 @@ export function NotificationsPanel({ placement = 'sidebar' }: { placement?: 'sid
             </ScrollFade>
 
             {/* Footer */}
-            {totalCount > 0 && (
-              <div className="border-t border-border-soft px-4 py-2.5">
-                <Link
-                  href="/dashboard/tasks?view=mine"
-                  onClick={() => setOpen(false)}
-                  className="text-xs text-signal-ink hover:text-foreground hover:underline"
-                >
-                  Ver todas mis tareas →
-                </Link>
-              </div>
-            )}
+            <div className="flex items-center justify-between border-t border-border-soft px-4 py-2.5">
+              <Link
+                href="/dashboard/bandeja"
+                onClick={() => setOpen(false)}
+                className="text-xs font-medium text-signal-ink hover:text-foreground hover:underline"
+              >
+                Ver toda la bandeja →
+              </Link>
+              <Link
+                href="/dashboard/ajustes-avisos"
+                onClick={() => setOpen(false)}
+                className="text-xs text-graphite hover:text-foreground hover:underline"
+              >
+                Ajustes de avisos
+              </Link>
+            </div>
           </div>
         </>
       )}

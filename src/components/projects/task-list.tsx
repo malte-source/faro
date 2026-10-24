@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { trpc } from '@/lib/trpc/client'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -12,7 +12,10 @@ import { PRIORITY } from '@/lib/utils'
 import { Plus, Trash2, AlertCircle, Pencil } from 'lucide-react'
 import type { TaskStatus } from '@/types/database'
 import { toast } from '@/components/ui/toaster'
-import { confirmAction } from '@/components/ui/confirm'
+import { changeStatusWithUndo, deleteWithUndo } from '@/lib/task-undo'
+import { usePendingDeletes } from '@/stores/pending-deletes'
+import { ROW_FOCUS_RING, useListNavigation } from '@/components/shortcuts/use-list-navigation'
+import { useIsMobile } from '@/components/mobile/use-media'
 import { DueDateChip } from '@/components/ui/due-date-chip'
 import { BlockedChip } from '@/components/ui/blocked-chip'
 import { AddTaskDialog } from './add-task-dialog'
@@ -36,17 +39,48 @@ export function TaskList({ projectId }: Props) {
   const [detailTaskId, setDetailTaskId] = useState<string | null>(null)
   const [addOpen, setAddOpen] = useState(false)
   const [moreTaskId, setMoreTaskId] = useState<string | null>(null)
-  const { data: tasks, isLoading } = trpc.tasks.byProject.useQuery(projectId)
+  const { data: allTasks, isLoading } = trpc.tasks.byProject.useQuery(projectId)
   const utils = trpc.useUtils()
+  // A task being deleted (undo window open) disappears at once and comes back if the user undoes it.
+  const pendingDeletes = usePendingDeletes(s => s.ids)
+  const tasks = useMemo(() => allTasks?.filter(t => !pendingDeletes.has(t.id)), [allTasks, pendingDeletes])
 
   const updateTask = trpc.tasks.update.useMutation({
     onSuccess: () => void Promise.all([utils.tasks.invalidate(), utils.projects.invalidate()]),
     onError: (e) => toast.error('No se pudo actualizar', e.message),
   })
-  const deleteTask = trpc.tasks.delete.useMutation({
-    onSuccess: () => { toast.success('Tarea borrada'); void Promise.all([utils.tasks.invalidate(), utils.projects.invalidate()]) },
-    onError: (e) => toast.error('No se pudo borrar', e.message),
-  })
+
+  // Status changes (incl. completing) apply now; "Deshacer" / ⌘Z restores the previous status.
+  const setStatusUndoable = (task: { id: string; title: string; status: string }, next: TaskStatus) =>
+    changeStatusWithUndo({
+      title: task.title,
+      from: task.status,
+      to: next,
+      apply: st => updateTask.mutate({ id: task.id, status: st as TaskStatus }),
+    })
+  const toggleDone = (task: { id: string; title: string; status: string }) =>
+    setStatusUndoable(task, task.status === 'done' ? 'todo' : 'done')
+
+  // Delete is held back for 6 s: no confirm dialog, "Deshacer" cancels it. Uses the vanilla client so the
+  // delete still runs if this screen is left during the window.
+  const removeTask = (task: { id: string; title: string }) =>
+    deleteWithUndo({
+      id: task.id,
+      title: task.title,
+      commit: async () => {
+        await utils.client.tasks.delete.mutate(task.id)
+        await Promise.all([utils.tasks.invalidate(), utils.projects.invalidate()])
+      },
+      onCommitError: e => toast.error('No se pudo borrar', e instanceof Error ? e.message : undefined),
+    })
+
+  // Keyboard (desktop): j / k move a ring, x completes, Enter opens the detail, e edits.
+  const isMobile = useIsMobile()
+  const { focusedId, rowProps } = useListNavigation(tasks ?? [], {
+    onToggle: toggleDone,
+    onOpen: t => setDetailTaskId(t.id),
+    onEdit: t => { setEditTaskId(t.id); setEditOpen(true) },
+  }, !isMobile)
 
   if (isLoading) {
     return (
@@ -102,7 +136,7 @@ export function TaskList({ projectId }: Props) {
               key={task.id}
               task={task as unknown as RowTask}
               onOpen={() => setDetailTaskId(task.id)}
-              onToggleDone={() => updateTask.mutate({ id: task.id, status: task.status === 'done' ? 'todo' : 'done' })}
+              onToggleDone={() => toggleDone(task)}
               onMore={() => setMoreTaskId(task.id)}
             />
           ))}
@@ -121,7 +155,8 @@ export function TaskList({ projectId }: Props) {
         return (
           <div
             key={task.id}
-            className="group flex items-center gap-3 rounded-lg border border-transparent px-3 py-2.5 hover:border-border hover:bg-surface transition-all cursor-pointer"
+            {...rowProps(task.id)}
+            className={`group flex items-center gap-3 rounded-lg border border-transparent px-3 py-2.5 hover:border-border hover:bg-surface transition-all cursor-pointer ${focusedId === task.id ? ROW_FOCUS_RING : ''}`}
             onClick={() => setDetailTaskId(task.id)}
           >
             <div className={`h-2 w-2 shrink-0 rounded-full ${priorityInfo?.dot ?? 'bg-stone'}`} />
@@ -149,9 +184,7 @@ export function TaskList({ projectId }: Props) {
             <div className="w-32 shrink-0">
               <Select
                 value={task.status}
-                onValueChange={val =>
-                  updateTask.mutate({ id: task.id, status: val as TaskStatus })
-                }
+                onValueChange={val => setStatusUndoable(task, val as TaskStatus)}
               >
                 <SelectTrigger className="h-7 text-xs">
                   <SelectValue />
@@ -171,15 +204,7 @@ export function TaskList({ projectId }: Props) {
               <Pencil className="h-3.5 w-3.5" />
             </button>
             <button
-              onClick={async (e) => {
-                e.stopPropagation()
-                const ok = await confirmAction({
-                  title: `Borrar tarea "${task.title}"`,
-                  description: 'No se puede deshacer.',
-                  variant: 'destructive',
-                })
-                if (ok) deleteTask.mutate(task.id)
-              }}
+              onClick={e => { e.stopPropagation(); removeTask(task) }}
               className="flex md:hidden md:group-hover:flex h-6 w-6 items-center justify-center rounded text-graphite hover:text-danger transition-colors"
             >
               <Trash2 className="h-3.5 w-3.5" />
@@ -200,7 +225,7 @@ export function TaskList({ projectId }: Props) {
         onClose={() => setMoreTaskId(null)}
         title={moreTask?.title ?? ''}
         status={moreTask?.status}
-        onStatus={s => moreTask && updateTask.mutate({ id: moreTask.id, status: s })}
+        onStatus={s => moreTask && setStatusUndoable(moreTask, s)}
       >
         <InsetGroup>
           <ListRow
@@ -212,12 +237,10 @@ export function TaskList({ projectId }: Props) {
             title="Borrar tarea"
             destructive
             leading={<IconTile tone="danger"><Trash2 /></IconTile>}
-            onClick={async () => {
+            onClick={() => {
               const t = moreTask
               setMoreTaskId(null)
-              if (!t) return
-              const ok = await confirmAction({ title: `Borrar tarea "${t.title}"`, description: 'No se puede deshacer.', variant: 'destructive' })
-              if (ok) deleteTask.mutate(t.id)
+              if (t) removeTask(t)
             }}
           />
         </InsetGroup>

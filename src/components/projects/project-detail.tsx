@@ -17,7 +17,13 @@ import { ProjectLinks } from './project-links'
 import { ProjectDrive } from './project-drive'
 import { ProjectChat } from './project-chat'
 import { ProjectRecurring } from './project-recurring'
-import { ProjectTaskGantt } from './project-task-gantt'
+import dynamic from 'next/dynamic'
+import { BlockSkeleton } from '@/components/common/lazy-skeleton'
+
+const ProjectTaskGantt = dynamic(() => import('./project-task-gantt').then(m => m.ProjectTaskGantt), {
+  ssr: false,
+  loading: () => <BlockSkeleton className="h-80" label="Cargando la línea de tiempo…" />,
+})
 import { PROJECT_STATUS, PRIORITY, KANBAN_STAGES } from '@/lib/utils'
 import {
   ArrowLeft, List, LayoutDashboard, Info, Users, Trash2, Activity, FileDown,

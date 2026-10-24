@@ -191,3 +191,12 @@ html, body {
 @media (prefers-reduced-motion: reduce) {
   * { scroll-behavior: auto !important; }
 }
+
+/*
+ * Long lists: let the browser skip layout and paint of rows far off-screen
+ * (content-visibility: auto). `auto <size>` remembers each row's real height after its
+ * first render, so the scrollbar doesn't jump. Not used on the chat message list: it
+ * keeps its scroll position by measuring scrollHeight when older messages are prepended.
+ */
+.cv-auto-row { content-visibility: auto; contain-intrinsic-size: auto 64px; }
+.cv-auto-row-lg { content-visibility: auto; contain-intrinsic-size: auto 84px; }

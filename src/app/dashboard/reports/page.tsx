@@ -1,5 +1,5 @@
 import { Header } from '@/components/layout/header'
-import { ReportsOverview } from '@/components/reports/reports-overview'
+import { ReportsOverview } from '@/components/reports/reports-overview-lazy'
 import { WeeklyDigest } from '@/components/reports/weekly-digest'
 import { WeeklyTimeReport } from '@/components/time/weekly-time-report'
 

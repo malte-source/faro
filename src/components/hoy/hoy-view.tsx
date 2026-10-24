@@ -1,7 +1,8 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Check, CheckCircle2, Undo2 } from 'lucide-react'
 import { trpc } from '@/lib/trpc/client'
 import { useEmpresaFilter } from '@/stores/empresa-filter'
@@ -9,6 +10,9 @@ import { EmpresaChips } from '@/components/layout/empresa-chips'
 import { EmptyState } from '@/components/ui/empty-state'
 import { SwipeRow } from '@/components/mobile/swipe-row'
 import { haptic } from '@/components/mobile/haptics'
+import { ROW_FOCUS_RING, useListNavigation } from '@/components/shortcuts/use-list-navigation'
+import { changeStatusWithUndo } from '@/lib/task-undo'
+import type { TaskStatus } from '@/types/database'
 import { addDays, daysBetween } from '@/lib/tz'
 import { cn } from '@/lib/utils'
 
@@ -62,11 +66,12 @@ function Check22({ done, onClick }: { done: boolean; onClick: () => void }) {
   )
 }
 
-function TaskRow({ t, done, onToggle, today }: { t: Item; done: boolean; onToggle: () => void; today?: string }) {
+function TaskRow({ t, done, onToggle, today, focused }: { t: Item; done: boolean; onToggle: () => void; today?: string; focused?: boolean }) {
   const due = dueLabel(t.dueDate, today)
   const late = !!t.dueDate && !!today && t.dueDate < today
   return (
     <SwipeRow
+      className={cn(focused && ROW_FOCUS_RING)}
       actions={[
         done
           ? { label: 'Deshacer', icon: <Undo2 className="h-5 w-5" />, tone: 'neutral', onTrigger: onToggle }
@@ -121,15 +126,33 @@ export function HoyView() {
   }, [checked, refresh])
   useEffect(() => () => { if (pending.current) refresh() }, [refresh])
 
-  const toggle = (id: string) => {
-    const nowDone = !checked.has(id)
+  // Single place that changes a task here: marks the row and saves the status.
+  const applyStatus = (id: string, status: string) => {
     setChecked(prev => {
       const next = new Set(prev)
-      if (nowDone) next.add(id); else next.delete(id)
+      if (status === 'done') next.add(id); else next.delete(id)
       return next
     })
-    update.mutate({ id, status: nowDone ? 'done' : 'todo' })
+    update.mutate({ id, status: status as TaskStatus })
   }
+
+  const toggle = (item: Item) => {
+    if (checked.has(item.id)) {
+      // Un-checking by hand puts the task back to the status it had, not always "todo".
+      applyStatus(item.id, item.status === 'done' ? 'todo' : item.status)
+    } else {
+      // Completing opens a 6 s window: "Deshacer" (or ⌘Z) restores the previous status.
+      changeStatusWithUndo({ title: item.title, from: item.status, to: 'done', apply: st => applyStatus(item.id, st) })
+    }
+  }
+
+  // Keyboard: j / k move a ring over the rows, x completes, Enter or e opens the project.
+  const router = useRouter()
+  const rows = useMemo(() => (data ? [...data.late, ...data.dueToday, ...data.week] : []), [data])
+  const { focusedId, rowProps } = useListNavigation<Item>(rows, {
+    onToggle: toggle,
+    onOpen: row => { if (row.project) router.push(`/dashboard/projects/${row.project.id}`) },
+  })
 
   if (isLoading) {
     return (
@@ -186,8 +209,8 @@ export function HoyView() {
             ) : (
               <ul className="divide-y divide-border-soft overflow-hidden rounded-[14px] border border-border bg-surface">
                 {g.items.map(t => (
-                  <li key={t.id}>
-                    <TaskRow t={t} done={checked.has(t.id)} onToggle={() => toggle(t.id)} today={today} />
+                  <li key={t.id} {...rowProps(t.id)}>
+                    <TaskRow t={t} done={checked.has(t.id)} onToggle={() => toggle(t)} today={today} focused={focusedId === t.id} />
                   </li>
                 ))}
               </ul>

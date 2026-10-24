@@ -6,6 +6,9 @@ import { TabBar } from '@/components/mobile/tab-bar'
 import { ScrollTracker } from '@/components/mobile/scroll-tracker'
 import { PullToRefresh } from '@/components/mobile/pull-to-refresh'
 import { CommandPalette } from '@/components/command/command-palette'
+import { ShortcutsProvider } from '@/components/shortcuts/shortcuts-provider'
+import { OutboxFlusher } from '@/components/mobile/outbox-chip'
+import { SearchSheetHost } from '@/components/search/search-sheet'
 import { OnboardingTour } from '@/components/onboarding/onboarding-tour'
 import { QuickAddBar } from '@/components/layout/quick-add-bar'
 import { GroupHomeRedirect } from '@/components/layout/group-home-redirect'
@@ -46,12 +49,17 @@ export default async function DashboardLayout({
       <TabBar />
       <ScrollTracker />
       <PullToRefresh />
+      <OutboxFlusher />
+      <SearchSheetHost />
 
       {/* PWA install prompt — shown when browser fires beforeinstallprompt */}
       <PwaInstallBanner />
 
       {/* Command palette — Cmd+K */}
       <CommandPalette />
+
+      {/* Keyboard layer: g-sequences, c, /, ? and the help sheet */}
+      <ShortcutsProvider />
 
       {/* Onboarding tour — shows once for new users */}
       <OnboardingTour />

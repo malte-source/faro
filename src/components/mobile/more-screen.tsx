@@ -6,12 +6,14 @@ import { useTheme } from 'next-themes'
 import {
   Activity, BarChart3, Building2, CalendarDays, CalendarRange, Gauge, GanttChartSquare, ClipboardList, FileText,
   Flame, Kanban, Landmark, LogOut, Map as MapIcon, MessagesSquare, Network, Repeat, Rocket, Scale, Settings, Target,
-  Users, Zap, Grid3x3, Sparkles, ChevronsUpDown,
+  Users, Zap, Grid3x3, Sparkles, ChevronsUpDown, Inbox, BellRing, Gauge as GaugeIcon,
 } from 'lucide-react'
 import { trpc } from '@/lib/trpc/client'
 import { InsetGroup, ListRow, IconTile } from '@/components/mobile/inset-list'
 import { Segmented } from '@/components/mobile/segmented'
 import { WorkspaceSheet } from '@/components/mobile/workspace-sheet'
+import { OutboxChip } from '@/components/mobile/outbox-chip'
+import { InstallCard } from '@/components/pwa/install-coach'
 
 type Row = { href: string; label: string; sub?: string; icon: typeof Users; tone?: 'night' | 'signal' | 'success' | 'info' | 'neutral'; badge?: number; direction?: boolean; team?: boolean }
 
@@ -53,6 +55,7 @@ export function MoreScreen() {
   const initials = name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase()
 
   const work: Row[] = [
+    { href: '/dashboard/bandeja', label: 'Bandeja', sub: 'Menciones, asignaciones y aprobaciones', icon: Inbox, tone: 'signal' as const },
     ...(groupMode
       ? [
           { href: '/dashboard/personas', label: 'Personas', sub: 'Quién trabaja dónde y con qué carga', icon: Users, tone: 'signal' as const },
@@ -134,7 +137,15 @@ export function MoreScreen() {
       <InsetGroup label="Trabajo">{renderRows(work)}</InsetGroup>
       <InsetGroup label="Vistas">{renderRows(VIEWS)}</InsetGroup>
       <InsetGroup label="Planificación">{renderRows(PLAN)}</InsetGroup>
-      <InsetGroup label="Análisis">{renderRows(ANALYSIS)}</InsetGroup>
+      <InsetGroup label="Análisis">
+        {renderRows(ANALYSIS)}
+        <ListRow
+          href="/dashboard/ia"
+          leading={<IconTile tone="success"><GaugeIcon /></IconTile>}
+          title="Uso de IA"
+          subtitle={isDirection ? 'Gasto del mes y presupuesto del grupo' : 'Tu uso del mes'}
+        />
+      </InsetGroup>
 
       <InsetGroup label="Apariencia">
         <div className="p-3">
@@ -151,7 +162,11 @@ export function MoreScreen() {
         </div>
       </InsetGroup>
 
+      <InstallCard />
+      <OutboxChip />
+
       <InsetGroup>
+        <ListRow href="/dashboard/ajustes-avisos" leading={<IconTile tone="signal"><BellRing /></IconTile>} title="Avisos" subtitle="Push, tipos de aviso y horas de silencio" />
         <ListRow href="/dashboard/settings" leading={<IconTile tone="neutral"><Settings /></IconTile>} title="Configuración" />
         <ListRow onClick={() => void signOutAndClear()} leading={<IconTile tone="danger"><LogOut /></IconTile>} title="Cerrar sesión" destructive />
       </InsetGroup>

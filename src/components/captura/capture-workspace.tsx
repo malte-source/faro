@@ -9,7 +9,8 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { toast } from '@/components/ui/toaster'
 import { hatFor, proposalWarning, weekBounds } from '@/lib/multiempresa'
-import { CAPTURE_FAILED_MESSAGE } from '@/lib/capture-schema'
+import { CAPTURE_FAILED_MESSAGE, CAPTURE_TOO_BIG_MESSAGE } from '@/lib/capture-schema'
+import { OutboxChip } from '@/components/mobile/outbox-chip'
 import { FaroMark } from '@/components/brand/logo'
 import { OriginalCard, SourcePicker } from './input-panel'
 import { ProposalCard, type ProposalView } from './proposal-card'
@@ -110,7 +111,8 @@ export function CaptureWorkspace() {
     setPending({ kind, previewUrl: url })
     try {
       const res = await submitter.sendFile(file, kind, { durationSec, onCaptureId: id => setCaptureId(id) })
-      if (res.status === 'failed') toast.error(res.error ?? CAPTURE_FAILED_MESSAGE)
+      if (res.queued) toast.info('Guardado en tu teléfono', 'Se enviará solo cuando vuelva la conexión.')
+      else if (res.status === 'failed') toast.error(res.error ?? CAPTURE_FAILED_MESSAGE)
     } catch (e) {
       toast.error('No se pudo enviar', e instanceof Error ? e.message : undefined)
     } finally {
@@ -124,6 +126,10 @@ export function CaptureWorkspace() {
     setPending({ kind: 'text', previewUrl: null })
     try {
       const res = await submitter.sendText(text)
+      if (res.queued) {
+        toast.info('Guardado en tu teléfono', 'Se enviará solo cuando vuelva la conexión.')
+        return
+      }
       setCaptureId(res.captureId)
       if (res.status === 'failed') toast.error(res.error ?? CAPTURE_FAILED_MESSAGE)
     } catch (e) {
@@ -147,6 +153,43 @@ export function CaptureWorkspace() {
       void utils.capture.invalidate()
     }
   }
+
+  // ── Landing from the Android share sheet (/dashboard/capturar/compartir redirects here) ──
+  const sharedText = params.get('t')
+  const shareAuto = params.get('auto') === '1'
+  const shareError = params.get('error')
+  const shareHandled = useRef(false)
+  useEffect(() => {
+    if (shareHandled.current) return
+    if (shareError) {
+      shareHandled.current = true
+      toast.error(
+        shareError === 'toobig' ? CAPTURE_TOO_BIG_MESSAGE
+          : shareError === 'unsupported' ? 'Faro lee audio, video, fotos y texto. Ese archivo no se puede leer.'
+          : shareError === 'empty' ? 'No llegó nada para analizar. Intenta compartir de nuevo.'
+          : shareError === 'plan' ? 'Tu plan no incluye la captura con IA.'
+          : 'No se pudo recibir lo que compartiste. Intenta de nuevo.',
+      )
+      router.replace('/dashboard/capturar')
+      return
+    }
+    if (shareAuto && sharedText) {
+      shareHandled.current = true
+      setTimeout(() => void handleText(sharedText), 0) // after the effect: handleText updates state
+      router.replace('/dashboard/capturar')
+    }
+    // handleText is recreated every render; this runs once per landing.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shareAuto, sharedText, shareError])
+
+  // A shared FILE arrives as a capture already uploaded: send it to Faro's reading right away.
+  const autoSubmitted = useRef(false)
+  useEffect(() => {
+    if (!shareAuto || sharedText || autoSubmitted.current || !captureId || data?.status !== 'uploaded') return
+    autoSubmitted.current = true
+    void retry()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shareAuto, sharedText, captureId, data?.status])
 
   // ── Review model: server proposals + local edits, recomputed instantly ─
   const review = useMemo(() => {
@@ -225,6 +268,7 @@ export function CaptureWorkspace() {
               <p className="mt-1.5 text-[14px] leading-snug text-graphite">Una nota de voz, una foto, un video o texto pegado. Tú revisas y confirmas.</p>
             </div>
           )}
+          <OutboxChip />
           <SourcePicker
             mode={mode}
             onModeChange={m => { if (hasCapture && !isProcessing) reset(); setMode(m) }}

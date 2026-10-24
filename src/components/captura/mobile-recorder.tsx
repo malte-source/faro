@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils'
 import { toast } from '@/components/ui/toaster'
 import { CAPTURE_MAX_SECONDS } from '@/lib/capture-schema'
 import { useCaptureSubmit } from './use-capture-submit'
+import { enqueueMedia, useOutboxFlusher } from './use-outbox'
 import { formatClock, useRecorder, type RecordingResult } from './use-recorder'
 
 /** Press shorter than this is a tap; longer starts recording. */
@@ -28,6 +29,7 @@ type Stage = 'idle' | 'recording' | 'sending'
 export function MobileCaptureFab({ onTap, className }: { onTap?: () => void; className?: string }) {
   const router = useRouter()
   const { sendFile } = useCaptureSubmit()
+  useOutboxFlusher() // this button lives in the tab bar: queued captures go out from any screen
   const [stage, setStage] = useState<Stage>('idle')
   const [willCancel, setWillCancel] = useState(false)
 
@@ -36,6 +38,10 @@ export function MobileCaptureFab({ onTap, className }: { onTap?: () => void; cla
       setStage('sending')
       try {
         const result = await sendFile(r.blob, 'audio', { durationSec: r.durationSec })
+        if (result.queued) {
+          toast.info('Guardado en tu teléfono', 'Se enviará solo cuando vuelva la conexión.')
+          return
+        }
         router.push(`/dashboard/capturar?c=${result.captureId}`)
       } catch (e) {
         toast.error('No se pudo enviar el audio', e instanceof Error ? e.message : undefined)
@@ -46,7 +52,17 @@ export function MobileCaptureFab({ onTap, className }: { onTap?: () => void; cla
     [router, sendFile],
   )
 
-  const recorder = useRecorder({ onLimit: r => void send(r) }) // 5-minute cap reached while still holding
+  const recorder = useRecorder({
+    onLimit: r => void send(r), // 5-minute cap reached while still holding
+    // A call came in / the app was backgrounded mid-recording: keep it in the outbox, send when we're back.
+    onInterrupt: r => {
+      holding.current = false
+      setStage('idle')
+      setWillCancel(false)
+      void enqueueMedia(r.blob, 'audio', { durationSec: r.durationSec })
+      toast.info('Grabación guardada', 'Se enviará en cuanto vuelvas a Faro.')
+    },
+  })
 
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const origin = useRef({ x: 0, y: 0 })

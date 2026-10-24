@@ -5,11 +5,25 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { CalendarCheck, FolderKanban, LayoutDashboard, CheckSquare, MessagesSquare, Menu, Plus } from 'lucide-react'
 import { trpc } from '@/lib/trpc/client'
+import { useChatUnreadTotal } from '@/components/chat/hooks'
 import { cn } from '@/lib/utils'
 import { haptic } from '@/components/mobile/haptics'
-import { MobileCaptureFab } from '@/components/captura/mobile-recorder'
+import dynamic from 'next/dynamic'
+import { Mic } from 'lucide-react'
 import { MobileCreateSheet } from '@/components/pwa/mobile-create-sheet'
 import { QuickCreateModal } from '@/components/tasks/quick-create-modal'
+
+const MobileCaptureFab = dynamic(() => import('@/components/captura/mobile-recorder').then(m => m.MobileCaptureFab), {
+  ssr: false,
+  loading: () => (
+    <span
+      aria-hidden
+      className="-mt-[22px] flex h-[54px] w-[54px] items-center justify-center rounded-full bg-signal text-night shadow-[0_6px_18px_rgba(255,176,32,0.45)] ring-4 ring-surface"
+    >
+      <Mic className="h-6 w-6" />
+    </span>
+  ),
+})
 
 interface Tab {
   key: string
@@ -36,7 +50,7 @@ export function TabBar() {
   const { data: me } = trpc.membership.me.useQuery(undefined, { staleTime: 60_000 })
   const groupMode = me?.groupMode ?? false
   const { data: counts } = trpc.inbox.counts.useQuery(undefined, { staleTime: 30_000, enabled: groupMode })
-  const { data: chat } = trpc.chat.unreadTotal.useQuery(undefined, { enabled: !!me?.isTeam, refetchInterval: 20_000, retry: false, staleTime: 10_000 })
+  const { data: chat } = useChatUnreadTotal(!!me?.isTeam)
 
   const chatBadge = chat?.total ?? 0
   const tabs: Tab[] = groupMode

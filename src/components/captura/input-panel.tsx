@@ -4,9 +4,12 @@ import { useRef, useState } from 'react'
 import { FileText, ImageIcon, Mic, Square, Video, type LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import { toast } from '@/components/ui/toaster'
+import { useIsIOS } from '@/components/pwa/platform'
 import { CAPTURE_MAX_SECONDS, CAPTURE_TEXT_MAX_CHARS, type TranscriptLine } from '@/lib/capture-schema'
 import { formatClock, useRecorder, type RecordingResult } from './use-recorder'
 import { kindOfFile } from './use-capture-submit'
+import { enqueueMedia } from './use-outbox'
 import { KIND_TAG, READ_LABEL } from './captura-utils'
 
 type Kind = 'audio' | 'video' | 'image' | 'text'
@@ -38,7 +41,15 @@ export function SourcePicker({
   const inputRef = useRef<HTMLInputElement>(null)
   const [text, setText] = useState('')
   const [dragging, setDragging] = useState(false)
-  const recorder = useRecorder({ onLimit: r => sendRecording(r) })
+  const isIOS = useIsIOS()
+  const recorder = useRecorder({
+    onLimit: r => sendRecording(r),
+    // A call or the app switcher interrupted the recording: keep it, send when we're back in front.
+    onInterrupt: r => {
+      void enqueueMedia(r.blob, 'audio', { durationSec: r.durationSec })
+      toast.info('Grabación guardada', 'Se enviará en cuanto vuelvas a Faro.')
+    },
+  })
 
   function sendRecording(r: RecordingResult) {
     onFile(r.blob, 'audio', r.durationSec)
@@ -160,6 +171,11 @@ export function SourcePicker({
               <p className="max-w-[34ch] text-[13px] text-graphite">
                 Notas de voz, videos cortos, fotos, capturas o texto pegado. Hasta 14 MB.
               </p>
+              {isIOS && (
+                <p className="max-w-[36ch] text-xs leading-snug text-graphite">
+                  En iPhone no se puede compartir directo a Faro: pega el texto, o elige el archivo desde Archivos o Fotos con los botones de arriba.
+                </p>
+              )}
               <Button
                 variant="outline"
                 size="sm"

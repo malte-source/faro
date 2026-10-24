@@ -1,6 +1,6 @@
 import { Header } from '@/components/layout/header'
 import { DashboardStats } from '@/components/projects/dashboard-stats'
-import { DashboardCharts } from '@/components/projects/dashboard-charts'
+import { DashboardCharts } from '@/components/projects/dashboard-charts-lazy'
 import { RecentProjects } from '@/components/projects/recent-projects'
 import { MyTasksWidget } from '@/components/tasks/my-tasks-widget'
 import { NextActionWidget } from '@/components/tasks/next-action-widget'
