@@ -1385,6 +1385,7 @@ export interface Database {
           transcript: Json | null
           status: CaptureStatus
           error: string | null
+          client_id: string | null
           created_at: string
         }
         Insert: {
@@ -1400,6 +1401,7 @@ export interface Database {
           transcript?: Json | null
           status?: CaptureStatus
           error?: string | null
+          client_id?: string | null
           created_at?: string
         }
         Update: {
@@ -1962,6 +1964,231 @@ export interface Database {
           }
         ]
       }
+      notifications: {
+        Row: {
+          id: string
+          org_id: string
+          user_id: string
+          kind: string
+          title: string
+          body: string | null
+          url: string | null
+          entity_type: string | null
+          entity_id: string | null
+          actor_id: string | null
+          read_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          org_id: string
+          user_id: string
+          kind: string
+          title: string
+          body?: string | null
+          url?: string | null
+          entity_type?: string | null
+          entity_id?: string | null
+          actor_id?: string | null
+          read_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          read_at?: string | null
+        }
+        Relationships: []
+      }
+      push_subscriptions: {
+        Row: {
+          id: string
+          user_id: string
+          endpoint: string
+          p256dh: string
+          auth: string
+          user_agent: string | null
+          created_at: string
+          last_used_at: string | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          endpoint: string
+          p256dh: string
+          auth: string
+          user_agent?: string | null
+          created_at?: string
+          last_used_at?: string | null
+        }
+        Update: {
+          p256dh?: string
+          auth?: string
+          user_agent?: string | null
+          last_used_at?: string | null
+        }
+        Relationships: []
+      }
+      user_notification_prefs: {
+        Row: {
+          user_id: string
+          push_enabled: boolean
+          kinds: Json
+          quiet_start: string | null
+          quiet_end: string | null
+          email_digest: 'off' | 'daily' | 'weekly'
+          email_instant: boolean
+          email_kinds: Json
+          digest_hour: number
+          last_digest_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          user_id: string
+          push_enabled?: boolean
+          kinds?: Json
+          quiet_start?: string | null
+          quiet_end?: string | null
+          email_digest?: 'off' | 'daily' | 'weekly'
+          email_instant?: boolean
+          email_kinds?: Json
+          digest_hour?: number
+          last_digest_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          push_enabled?: boolean
+          kinds?: Json
+          quiet_start?: string | null
+          quiet_end?: string | null
+          email_digest?: 'off' | 'daily' | 'weekly'
+          email_instant?: boolean
+          email_kinds?: Json
+          digest_hour?: number
+          last_digest_at?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      email_log: {
+        Row: { id: string; user_id: string; kind: string; created_at: string }
+        Insert: { id?: string; user_id: string; kind: string; created_at?: string }
+        Update: { kind?: string }
+        Relationships: []
+      }
+      ai_usage: {
+        Row: {
+          id: string
+          org_id: string
+          user_id: string | null
+          feature: string
+          model: string
+          tier: string
+          input_tokens: number
+          output_tokens: number
+          cost_usd: number
+          latency_ms: number | null
+          ok: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          org_id: string
+          user_id?: string | null
+          feature: string
+          model: string
+          tier?: string
+          input_tokens?: number
+          output_tokens?: number
+          cost_usd?: number
+          latency_ms?: number | null
+          ok?: boolean
+          created_at?: string
+        }
+        Update: {
+          feature?: string
+          cost_usd?: number
+        }
+        Relationships: []
+      }
+      ai_budgets: {
+        Row: {
+          org_id: string
+          monthly_usd: number | null
+          per_user_monthly_usd: number | null
+          warn_pct: number
+          updated_by: string | null
+          updated_at: string
+        }
+        Insert: {
+          org_id: string
+          monthly_usd?: number | null
+          per_user_monthly_usd?: number | null
+          warn_pct?: number
+          updated_by?: string | null
+          updated_at?: string
+        }
+        Update: {
+          monthly_usd?: number | null
+          per_user_monthly_usd?: number | null
+          warn_pct?: number
+          updated_by?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      search_documents: {
+        Row: {
+          id: string
+          org_id: string
+          workspace_id: string | null
+          entity_type: 'task' | 'document' | 'chat' | 'decision' | 'update'
+          entity_id: string
+          title: string
+          body: string
+          project_id: string | null
+          channel_id: string | null
+          author_id: string | null
+          url: string
+          source_updated_at: string
+          tsv: string | null
+          embedding: string | null
+          embedded_at: string | null
+        }
+        Insert: {
+          id?: string
+          org_id: string
+          workspace_id?: string | null
+          entity_type: 'task' | 'document' | 'chat' | 'decision' | 'update'
+          entity_id: string
+          title?: string
+          body?: string
+          project_id?: string | null
+          channel_id?: string | null
+          author_id?: string | null
+          url: string
+          source_updated_at: string
+          embedding?: string | null
+          embedded_at?: string | null
+        }
+        Update: {
+          workspace_id?: string | null
+          title?: string
+          body?: string
+          project_id?: string | null
+          channel_id?: string | null
+          author_id?: string | null
+          url?: string
+          source_updated_at?: string
+          embedding?: string | null
+          embedded_at?: string | null
+        }
+        Relationships: []
+      }
+      search_index_state: {
+        Row: { stream: string; cursor: string | null; cursor_id: string | null; updated_at: string }
+        Insert: { stream: string; cursor?: string | null; cursor_id?: string | null; updated_at?: string }
+        Update: { cursor?: string | null; cursor_id?: string | null; updated_at?: string }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -1984,6 +2211,57 @@ export interface Database {
       task_overview_stats: {
         Args: { p_project_ids: string[]; p_user_id: string; p_today: string }
         Returns: Array<{ status: string; total: number; overdue: number; mine_pending: number }>
+      }
+      /** Per-channel unread/mention counts and last-message preview (supabase/migrations/20261027_chat_counts.sql). */
+      chat_unread_counts: {
+        Args: { p_user: string; p_org: string }
+        Returns: Array<{
+          channel_id: string
+          unread: number
+          mentions: number
+          last_message_at: string | null
+          last_message_body: string | null
+          last_author_id: string | null
+        }>
+      }
+      /** Hybrid (full-text + vector) search with the permission lists applied inside the query (20261027_search.sql). */
+      search_hybrid: {
+        Args: {
+          p_org: string
+          p_query: string
+          p_embedding: string | null
+          p_project_ids: string[]
+          p_channel_ids: string[]
+          p_workspace_ids: string[]
+          p_types: string[] | null
+          p_limit?: number
+        }
+        Returns: Array<{
+          entity_type: 'task' | 'document' | 'chat' | 'decision' | 'update'
+          entity_id: string
+          title: string
+          body: string
+          project_id: string | null
+          channel_id: string | null
+          workspace_id: string | null
+          author_id: string | null
+          url: string
+          source_updated_at: string
+          score: number
+        }>
+      }
+      ai_usage_rollup: {
+        Args: { p_org: string; p_from: string; p_to: string; p_tz: string; p_user?: string | null }
+        Returns: Array<{
+          feature: string
+          user_id: string | null
+          day: string
+          calls: number
+          failed: number
+          input_tokens: number
+          output_tokens: number
+          cost_usd: number
+        }>
       }
     }
     Enums: {
